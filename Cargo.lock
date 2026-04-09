@@ -518,7 +518,7 @@ dependencies = [
 [[package]]
 name = "poulpy-core"
 version = "0.5.0"
-source = "git+https://github.com/cedoor/poulpy?branch=feat%2Ffheuint-tmp-bytes#b8a0cf51111a644ebc3bb62de31b1575cd6c4ea7"
+source = "git+https://github.com/phantomzone-org/poulpy?branch=main#08f73f43a59af4def1dd4183a07b171ab18f191b"
 dependencies = [
  "bytemuck",
  "byteorder",
@@ -535,7 +535,7 @@ dependencies = [
 [[package]]
 name = "poulpy-cpu-avx"
 version = "0.5.0"
-source = "git+https://github.com/cedoor/poulpy?branch=feat%2Ffheuint-tmp-bytes#b8a0cf51111a644ebc3bb62de31b1575cd6c4ea7"
+source = "git+https://github.com/phantomzone-org/poulpy?branch=main#08f73f43a59af4def1dd4183a07b171ab18f191b"
 dependencies = [
  "bytemuck",
  "byteorder",
@@ -553,7 +553,7 @@ dependencies = [
 [[package]]
 name = "poulpy-cpu-ref"
 version = "0.5.0"
-source = "git+https://github.com/cedoor/poulpy?branch=feat%2Ffheuint-tmp-bytes#b8a0cf51111a644ebc3bb62de31b1575cd6c4ea7"
+source = "git+https://github.com/phantomzone-org/poulpy?branch=main#08f73f43a59af4def1dd4183a07b171ab18f191b"
 dependencies = [
  "bytemuck",
  "byteorder",
@@ -569,7 +569,7 @@ dependencies = [
 [[package]]
 name = "poulpy-hal"
 version = "0.5.0"
-source = "git+https://github.com/cedoor/poulpy?branch=feat%2Ffheuint-tmp-bytes#b8a0cf51111a644ebc3bb62de31b1575cd6c4ea7"
+source = "git+https://github.com/phantomzone-org/poulpy?branch=main#08f73f43a59af4def1dd4183a07b171ab18f191b"
 dependencies = [
  "bytemuck",
  "byteorder",
@@ -588,7 +588,7 @@ dependencies = [
 [[package]]
 name = "poulpy-schemes"
 version = "0.5.0"
-source = "git+https://github.com/cedoor/poulpy?branch=feat%2Ffheuint-tmp-bytes#b8a0cf51111a644ebc3bb62de31b1575cd6c4ea7"
+source = "git+https://github.com/phantomzone-org/poulpy?branch=main#08f73f43a59af4def1dd4183a07b171ab18f191b"
 dependencies = [
  "byteorder",
  "criterion",

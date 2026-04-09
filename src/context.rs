@@ -535,21 +535,23 @@ fn compute_arena_bytes(module: &Mod, params: &Params) -> usize {
     let decrypt = dummy.decrypt_tmp_bytes(module);
 
     // Each BDD circuit has a different max_state_size, so all 10 ops are
-    // queried and the max is taken.
-    let atk = &params.bdd_layout.cbt_layout.atk_layout;
+    // queried and the max is taken. Poulpy's `*_tmp_bytes` helpers require a
+    // prepared evaluation key (`GLWEAutomorphismKeyHelper`), not raw layouts.
+    let bdd_key_prepared: BDDKeyPrepared<Vec<u8>, CGGI, crate::backend::BE> =
+        BDDKeyPrepared::alloc_from_infos(module, &params.bdd_layout);
     let g = &params.ggsw_layout;
     let r = &params.glwe_layout;
     let eval = [
-        dummy.add_tmp_bytes(module, r, g, atk),
-        dummy.sub_tmp_bytes(module, r, g, atk),
-        dummy.and_tmp_bytes(module, r, g, atk),
-        dummy.or_tmp_bytes(module, r, g, atk),
-        dummy.xor_tmp_bytes(module, r, g, atk),
-        dummy.sll_tmp_bytes(module, r, g, atk),
-        dummy.srl_tmp_bytes(module, r, g, atk),
-        dummy.sra_tmp_bytes(module, r, g, atk),
-        dummy.slt_tmp_bytes(module, r, g, atk),
-        dummy.sltu_tmp_bytes(module, r, g, atk),
+        dummy.add_tmp_bytes(module, r, g, &bdd_key_prepared),
+        dummy.sub_tmp_bytes(module, r, g, &bdd_key_prepared),
+        dummy.and_tmp_bytes(module, r, g, &bdd_key_prepared),
+        dummy.or_tmp_bytes(module, r, g, &bdd_key_prepared),
+        dummy.xor_tmp_bytes(module, r, g, &bdd_key_prepared),
+        dummy.sll_tmp_bytes(module, r, g, &bdd_key_prepared),
+        dummy.srl_tmp_bytes(module, r, g, &bdd_key_prepared),
+        dummy.sra_tmp_bytes(module, r, g, &bdd_key_prepared),
+        dummy.slt_tmp_bytes(module, r, g, &bdd_key_prepared),
+        dummy.sltu_tmp_bytes(module, r, g, &bdd_key_prepared),
     ]
     .into_iter()
     .max()
