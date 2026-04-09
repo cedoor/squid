@@ -15,7 +15,7 @@ alwaysApply: false
 ## Types
 
 - The backend is selected at compile time via `crate::backend::BE` (see `src/backend.rs`). `type Mod = Module<crate::backend::BE>` in `context.rs`. Do not add `<BE: Backend>` generics to any public type. Use `crate::backend::BE` everywhere internally instead of hard-coding `FFT64Ref`.
-- Layout fields on `Params` and its nested structs use Poulpy newtypes (`Degree`, `Base2K`, etc.). Prefer `Params::default_128bit()`. For a custom `Params`, keep all layouts self-consistent (same `n_glwe`, `base2k`, `rank`, … across `glwe_layout`, `ggsw_layout`, `bdd_layout`).
+- Layout fields on `Params` and its nested structs use Poulpy newtypes (`Degree`, `Base2K`, etc.). Prefer `Params::unsecure()` for the Poulpy `bdd_arithmetic` example bundle (not a security claim). For a custom `Params`, keep all layouts self-consistent (same `n_glwe`, `base2k`, `rank`, … across `glwe_layout`, `ggsw_layout`, `bdd_layout`).
 - `Ciphertext<T>` is always in standard (`Vec<u8>`) form. `FheUintPrepared` must never escape `eval_binary`.
 
 ## Error handling

@@ -8,7 +8,7 @@
 //! ```rust,no_run
 //! use squid::{Context, Params};
 //!
-//! let mut ctx = Context::new(Params::default_128bit());
+//! let mut ctx = Context::new(Params::unsecure());
 //! let (sk, ek) = ctx.keygen();
 //!
 //! let a = ctx.encrypt::<u32>(42, &sk);
@@ -52,8 +52,8 @@ type Mod = Module<crate::backend::BE>;
 /// Parameter set for a [`Context`].
 ///
 /// Wraps all layout descriptors needed for key generation, encryption, and
-/// evaluation.  Use [`Params::default_128bit`] to get a validated set that
-/// targets ~128-bit security at n = 1024.
+/// evaluation.  [`Params::unsecure`] matches Poulpy's `bdd_arithmetic` example
+/// (n = 1024) and is **not** presented as a vetted security level.
 ///
 /// Advanced users may construct custom `Params` directly, but must ensure
 /// consistency across all layout fields — concretely, `n_glwe`, `base2k`, and
@@ -76,17 +76,15 @@ pub struct Params {
 }
 
 impl Params {
-    /// Conservative parameter set targeting approximately 128-bit security.
+    /// **Not a production security target** — same bundle as Poulpy's `bdd_arithmetic` example
+    /// (`poulpy-schemes/examples/bdd_arithmetic.rs`).
     ///
-    /// Uses the same parameters as Poulpy's reference `bdd_arithmetic` example:
     /// - GLWE ring degree n = 1024, rank = 1
     /// - LWE dimension n_lwe = 567 (block-binary secret, block size 7)
     /// - base2k = 17, torus precision = 2×base2k
     ///
-    /// These parameters are suitable for `u32` FHE arithmetic.  They have not
-    /// been formally security-analysed by squid; see the Poulpy documentation
-    /// for the authoritative security estimates.
-    pub fn default_128bit() -> Self {
+    /// For demos and tests only unless you have your own parameter analysis.
+    pub fn unsecure() -> Self {
         const N_GLWE: u32 = 1024;
         const N_LWE: u32 = 567;
         const BINARY_BLOCK_SIZE: u32 = 7;

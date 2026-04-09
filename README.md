@@ -14,8 +14,8 @@ Poulpy is a low-level, modular toolkit exposing the full machinery of lattice-ba
 use squid::{Context, Params};
 
 fn main() {
-    // Create a context with default 128-bit security parameters
-    let mut ctx = Context::new(Params::default_128bit());
+    // Demo preset — not a vetted security level (see Params::unsecure docs)
+    let mut ctx = Context::new(Params::unsecure());
 
     // Generate keys (secret key + evaluation key)
     let (sk, ek) = ctx.keygen();
@@ -70,5 +70,5 @@ The public API is identical regardless of which backend is selected.
 
 - **Hide scratch management.** Callers never allocate or thread scratch buffers.
 - **Hide lifecycle transitions.** The Standard → Prepared → BDD-eval pipeline is handled internally; users see one coherent `Ciphertext<T>` type.
-- **Sane parameter defaults.** `Params::default_128bit()` ships a validated parameter set; advanced users can construct custom `Params`.
+- **Explicitly non-production defaults.** `Params::unsecure()` matches Poulpy's `bdd_arithmetic` example for demos; treat it as unaudited unless you analyse parameters yourself.
 - **No magic.** Every abstraction is traceable to the underlying Poulpy call. No hidden global state, no surprising allocations beyond the initial `Context::new`.

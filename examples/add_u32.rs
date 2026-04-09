@@ -10,8 +10,8 @@
 use squid::{Context, Params};
 
 fn main() {
-    println!("Creating context with default 128-bit parameters...");
-    let mut ctx = Context::new(Params::default_128bit());
+    println!("Creating context (Params::unsecure — demo / non-production)...");
+    let mut ctx = Context::new(Params::unsecure());
 
     println!("Generating keys...");
     let (sk, ek) = ctx.keygen();
