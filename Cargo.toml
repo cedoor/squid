@@ -1,0 +1,16 @@
+[package]
+name = "squid"
+version = "0.1.0"
+edition = "2021"
+description = "An ergonomic Rust wrapper for Poulpy FHE."
+
+[features]
+backend-avx = ["dep:poulpy-cpu-avx"]
+
+[dependencies]
+poulpy-core = { git = "https://github.com/cedoor/poulpy", branch = "feat/fheuint-tmp-bytes" }
+poulpy-schemes = { git = "https://github.com/cedoor/poulpy", branch = "feat/fheuint-tmp-bytes" }
+poulpy-hal = { git = "https://github.com/cedoor/poulpy", branch = "feat/fheuint-tmp-bytes" }
+poulpy-cpu-ref = { git = "https://github.com/cedoor/poulpy", branch = "feat/fheuint-tmp-bytes" }
+poulpy-cpu-avx = { git = "https://github.com/cedoor/poulpy", branch = "feat/fheuint-tmp-bytes", optional = true }
+getrandom = "0.3"

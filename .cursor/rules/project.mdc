@@ -1,0 +1,32 @@
+---
+description: Project purpose, scope, and relationship to Poulpy
+alwaysApply: true
+---
+
+# Project: squid
+
+`squid` is an ergonomic Rust wrapper over [Poulpy](https://github.com/phantomzone-org/poulpy), a low-level, modular FHE toolkit. Poulpy exposes the full machinery of lattice-based homomorphic encryption and leaves resource management entirely to the caller. squid wraps it with a smaller, opinionated API.
+
+## Current scope
+
+squid currently wraps `poulpy-schemes::bin_fhe::bdd_arithmetic` only — the one fully exposed end-to-end capability in `poulpy-schemes`. That means:
+
+- Key generation: `GLWESecret`, `LWESecret`, `BDDKey`
+- Encrypt / decrypt `u8`, `u16`, `u32` via `FheUint`
+- Homomorphic operations: `add`, `sub`, `xor`, `or`, `and`, `sll`, `srl`, `sra`, `slt`, `sltu`
+- Scratch management across all of the above
+- Lifecycle transitions: Standard -> Prepared for keys and ciphertexts
+
+The scope will expand as `poulpy-schemes` adds more scheme-level implementations (CKKS, BGV, etc.).
+
+## Public API surface
+
+Everything flows through `Context`. The user-facing types are:
+
+| Type | Role |
+|---|---|
+| `Context` | Owns `Module<BE>`, scratch arena, and `Params`. Entry point for all operations. |
+| `Params` | Layout parameter bundle. Use `Params::default_128bit()` or construct custom. |
+| `SecretKey` | Private key material: standard GLWE + LWE secrets and prepared GLWE for encrypt/decrypt. Returned by `Context::keygen`. |
+| `EvaluationKey` | Public evaluation key bundle (`BDDKey` standard + prepared). Returned by `Context::keygen`. |
+| `Ciphertext<T>` | Encrypted `T` value (`u8`, `u16`, `u32`). All ops run through `Context`. |

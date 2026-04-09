@@ -1,0 +1,34 @@
+---
+description: Hard constraints — what NOT to do in squid
+alwaysApply: true
+---
+
+# Constraints
+
+## Never re-implement Poulpy internals
+
+If a primitive exists in `poulpy-core`, `poulpy-schemes`, `poulpy-hal`, or `poulpy-cpu-ref`, use it. Writing a "simpler" version in squid defeats the purpose and will drift from Poulpy's correctness guarantees.
+
+## Never add dependencies without checking Poulpy first
+
+Poulpy already pulls in most primitives (RNGs, serialization, SIMD helpers). Adding duplicates fragments the dependency tree and risks version conflicts.
+
+## Never expose scratch buffers in the public API
+
+`ScratchOwned`, `Scratch`, and any `*_tmp_bytes` methods are internal. If you cannot hide scratch for a given operation, that is a design discussion, not a quiet API addition.
+
+## Never expose prepared forms publicly
+
+`FheUintPrepared`, `BDDKeyPrepared`, `GLWESecretPrepared` — these are implementation details inside `Context`, `SecretKey`, and `EvaluationKey` (only as private fields of those opaque types). Users must never construct or hold them outside squid’s wrappers.
+
+## Never expose `Module<BE>` publicly
+
+`Module<crate::backend::BE>` lives inside `Context`. It must not appear in any public type signature.
+
+## Never add backend-generic code to the public API
+
+`<BE: Backend>` generics must not appear in any public type or function. Backend dispatch is an internal concern.
+
+## Never wrap poulpy-core directly (yet)
+
+squid's entry point is `poulpy-schemes::bin_fhe::bdd_arithmetic`. Direct wrapping of raw GLWE, GGSW, or LWE primitives is out of scope until a concrete use case requires it.

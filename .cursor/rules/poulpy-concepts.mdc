@@ -1,0 +1,48 @@
+---
+description: Key Poulpy concepts required before modifying squid code
+globs: src/**/*.rs
+alwaysApply: false
+---
+
+# Poulpy concepts
+
+Read this before touching any non-trivial code.
+
+## 1. Scratch arenas
+
+Poulpy operations never heap-allocate on the hot path. Every operation accepts `&mut Scratch<BE>` and a companion `*_tmp_bytes` method tells the caller how many bytes are needed. `ScratchOwned<BE>` is the owned allocation; `.borrow()` yields `&mut Scratch<BE>`. squid sizes and owns the arena inside `Context`.
+
+## 2. Three-layer lifecycle
+
+Every ciphertext and key lives in one of three representations:
+
+| Layer | Storage | Use |
+|---|---|---|
+| Standard | `Vec<u8>`, serializable | Encrypt, decrypt, store, send |
+| Compressed | seed + body only | Reduced-size storage |
+| Prepared | DFT/NTT domain, backend-specific | Fast multiplication, key-switching |
+
+squid hides this: users always hold Standard forms. Prepared forms are created transiently inside `Context` operations and never surface in the public API.
+
+## 3. BDD computation model
+
+Homomorphic arithmetic on `FheUint` follows three steps:
+
+1. **Encrypt** — pack integer bits into a single GLWE polynomial (`FheUint`).
+2. **Prepare** — circuit-bootstrap each bit into a GGSW ciphertext (`FheUintPrepared`). This is the expensive step (~seconds per 32-bit value on CPU).
+3. **BDD eval** — evaluate a pre-compiled BDD circuit bit-by-bit via CMux gates; output is a fresh `FheUint`.
+
+Prepare must run on each input before each operation. squid hides this: `Context::eval_binary` prepares both inputs, runs the op, and returns a fresh `Ciphertext<T>`.
+
+## 4. Trait-based dispatch
+
+All arithmetic is expressed as trait methods on `Module<BE>`. The backend `BE` is a marker type selected at compile time via `crate::backend::BE` (default: `FFT64Ref`; opt-in: `FFT64Avx` with `--features backend-avx`). The concrete type alias `type Mod = Module<crate::backend::BE>` is used throughout squid. No generic `<BE>` surfaces in squid's public API.
+
+## 5. BDD key hierarchy
+
+`BDDKey` bundles three sub-keys:
+- `CircuitBootstrappingKey` — blind rotation key + automorphism key + tensor switching key
+- `GLWESwitchingKey` (optional) — rank reduction before LWE extraction
+- `GLWEToLWESwitchingKey` — GLWE -> LWE extraction
+
+All generated from a `GLWESecret` + `LWESecret` pair in a single `BDDKey::encrypt_sk` call.

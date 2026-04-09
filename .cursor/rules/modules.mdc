@@ -1,0 +1,27 @@
+---
+description: Module responsibilities and boundaries for squid
+globs: src/**/*.rs
+alwaysApply: false
+---
+
+# Module responsibilities
+
+| Module | File | Responsibility |
+|---|---|---|
+| `context` | `src/context.rs` | Single user entry point. Owns `Module<BE>`, scratch arena, `Params`. All public API flows through `Context`. |
+| `backend` | `src/backend.rs` | Compile-time `BE` alias (`FFT64Ref` or `FFT64Avx` via `backend-avx`). `pub(crate)` only; not re-exported from `lib.rs`. |
+| `scratch` | `src/scratch.rs` | Scratch arena (`Arena`): `new_arena` and `borrow` over `ScratchOwned<BE>`. Required byte count is computed in `Context` (Poulpy `*_tmp_bytes`, `compute_arena_bytes`), not in this module. `pub(crate)`; not part of the supported public API. |
+| `keys` | `src/keys.rs` | `SecretKey` and `EvaluationKey` types. Holds standard-form and prepared-form key material. Hides all lifecycle transitions. |
+| `ciphertext` | `src/ciphertext.rs` | `Ciphertext<T>` newtype over `FheUint<Vec<u8>, T>`. The only ciphertext form users ever see. |
+
+## lib.rs
+
+`lib.rs` is module declarations and `pub use` re-exports only. No logic. Declares `pub mod` for `context`, `scratch`, `keys`, and `ciphertext`, and a private `mod backend`.
+
+## Ownership model
+
+- `Context` owns the `Module<BE>` and `ScratchOwned<BE>` (via `scratch::Arena`).
+- `SecretKey` owns `GLWESecret<Vec<u8>>` and `LWESecret<Vec<u8>>` (standard) plus `GLWESecretPrepared<Vec<u8>, BE>` (encrypt/decrypt).
+- `EvaluationKey` owns both `BDDKey<Vec<u8>, CGGI>` (standard) and `BDDKeyPrepared<Vec<u8>, CGGI, BE>` (prepared).
+- `Ciphertext<T>` owns `FheUint<Vec<u8>, T>` (standard form only).
+- `FheUintPrepared` is allocated temporarily inside `Context::eval_binary` and never escapes.

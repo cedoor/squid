@@ -1,0 +1,9 @@
+# Rust
+/target/
+**/*.rs.bk
+
+# MSVC debug symbols
+*.pdb
+
+# macOS
+.DS_Store
