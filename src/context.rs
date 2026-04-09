@@ -18,27 +18,24 @@
 //! ```
 
 use poulpy_core::layouts::{
-    Base2K, Degree, Dnum, Dsize, GGSWLayout, GGLWEToGGSWKeyLayout, GLWEAutomorphismKeyLayout, GLWELayout, GLWESecret,
-    GLWESecretPrepared, GLWESwitchingKeyLayout, GLWEToLWEKeyLayout, LWESecret, Rank, TorusPrecision,
+    Base2K, Degree, Dnum, Dsize, GGLWEToGGSWKeyLayout, GGSWLayout, GLWEAutomorphismKeyLayout,
+    GLWELayout, GLWESecret, GLWESecretPrepared, GLWESwitchingKeyLayout, GLWEToLWEKeyLayout,
+    LWESecret, Rank, TorusPrecision,
 };
-use poulpy_hal::{
-    api::ModuleNew,
-    layouts::Module,
-    source::Source,
-};
+use poulpy_hal::{api::ModuleNew, layouts::Module, source::Source};
 use poulpy_schemes::bin_fhe::{
     bdd_arithmetic::{
-        Add, And, BDDKey, BDDKeyEncryptSk, BDDKeyLayout, BDDKeyPrepared, BDDKeyPreparedFactory, FheUint, FheUintPrepare,
-        FheUintPrepared, FromBits, Or, Sll, Slt, Sltu, Sra, Srl, Sub, ToBits, UnsignedInteger, Xor,
+        Add, And, BDDKey, BDDKeyEncryptSk, BDDKeyLayout, BDDKeyPrepared, BDDKeyPreparedFactory,
+        FheUint, FheUintPrepare, FheUintPrepared, FromBits, Or, Sll, Slt, Sltu, Sra, Srl, Sub,
+        ToBits, UnsignedInteger, Xor,
     },
     blind_rotation::{BlindRotationKeyLayout, CGGI},
     circuit_bootstrapping::CircuitBootstrappingKeyLayout,
 };
 
 use crate::{
-    Ciphertext,
     keys::{EvaluationKey, SecretKey},
-    scratch,
+    scratch, Ciphertext,
 };
 
 // ── Module alias ────────────────────────────────────────────────────────────
@@ -198,7 +195,11 @@ impl Context {
             .scratch_bytes
             .unwrap_or_else(|| compute_arena_bytes(&module, &params));
         let arena = scratch::new_arena(bytes);
-        Context { params, module, arena }
+        Context {
+            params,
+            module,
+            arena,
+        }
     }
 
     /// Generate a fresh secret key and the corresponding evaluation key.
@@ -228,8 +229,7 @@ impl Context {
         sk_glwe_prepared.prepare(&self.module, &sk_glwe);
 
         // BDD evaluation key (standard form)
-        let mut bdd_key: BDDKey<Vec<u8>, CGGI> =
-            BDDKey::alloc_from_infos(&self.params.bdd_layout);
+        let mut bdd_key: BDDKey<Vec<u8>, CGGI> = BDDKey::alloc_from_infos(&self.params.bdd_layout);
         bdd_key.encrypt_sk(
             &self.module,
             &sk_lwe,
@@ -242,14 +242,17 @@ impl Context {
         // BDD evaluation key (prepared / DFT form)
         let mut bdd_key_prepared: BDDKeyPrepared<Vec<u8>, CGGI, crate::backend::BE> =
             BDDKeyPrepared::alloc_from_infos(&self.module, &self.params.bdd_layout);
-        bdd_key_prepared.prepare(
-            &self.module,
-            &bdd_key,
-            scratch::borrow(&mut self.arena),
-        );
+        bdd_key_prepared.prepare(&self.module, &bdd_key, scratch::borrow(&mut self.arena));
 
-        let sk = SecretKey { sk_glwe, sk_glwe_prepared, sk_lwe };
-        let ek = EvaluationKey { bdd_key, bdd_key_prepared };
+        let sk = SecretKey {
+            sk_glwe,
+            sk_glwe_prepared,
+            sk_lwe,
+        };
+        let ek = EvaluationKey {
+            bdd_key,
+            bdd_key_prepared,
+        };
         (sk, ek)
     }
 
@@ -298,7 +301,13 @@ impl Context {
     /// 1. Allocate and populate `FheUintPrepared` for `a` and `b`.
     /// 2. Allocate output `FheUint`.
     /// 3. Invoke `op` on it.
-    fn eval_binary<T, F>(&mut self, a: &Ciphertext<T>, b: &Ciphertext<T>, ek: &EvaluationKey, op: F) -> Ciphertext<T>
+    fn eval_binary<T, F>(
+        &mut self,
+        a: &Ciphertext<T>,
+        b: &Ciphertext<T>,
+        ek: &EvaluationKey,
+        op: F,
+    ) -> Ciphertext<T>
     where
         T: UnsignedInteger,
         F: FnOnce(
@@ -343,7 +352,12 @@ impl Context {
     // ── Arithmetic and logical operations ────────────────────────────────────
 
     /// Homomorphic wrapping addition: `a + b`.
-    pub fn add<T>(&mut self, a: &Ciphertext<T>, b: &Ciphertext<T>, ek: &EvaluationKey) -> Ciphertext<T>
+    pub fn add<T>(
+        &mut self,
+        a: &Ciphertext<T>,
+        b: &Ciphertext<T>,
+        ek: &EvaluationKey,
+    ) -> Ciphertext<T>
     where
         T: UnsignedInteger,
         FheUint<Vec<u8>, T>: Add<T, crate::backend::BE>,
@@ -354,7 +368,12 @@ impl Context {
     }
 
     /// Homomorphic wrapping subtraction: `a - b`.
-    pub fn sub<T>(&mut self, a: &Ciphertext<T>, b: &Ciphertext<T>, ek: &EvaluationKey) -> Ciphertext<T>
+    pub fn sub<T>(
+        &mut self,
+        a: &Ciphertext<T>,
+        b: &Ciphertext<T>,
+        ek: &EvaluationKey,
+    ) -> Ciphertext<T>
     where
         T: UnsignedInteger,
         FheUint<Vec<u8>, T>: Sub<T, crate::backend::BE>,
@@ -365,7 +384,12 @@ impl Context {
     }
 
     /// Homomorphic bitwise AND: `a & b`.
-    pub fn and<T>(&mut self, a: &Ciphertext<T>, b: &Ciphertext<T>, ek: &EvaluationKey) -> Ciphertext<T>
+    pub fn and<T>(
+        &mut self,
+        a: &Ciphertext<T>,
+        b: &Ciphertext<T>,
+        ek: &EvaluationKey,
+    ) -> Ciphertext<T>
     where
         T: UnsignedInteger,
         FheUint<Vec<u8>, T>: And<T, crate::backend::BE>,
@@ -376,7 +400,12 @@ impl Context {
     }
 
     /// Homomorphic bitwise OR: `a | b`.
-    pub fn or<T>(&mut self, a: &Ciphertext<T>, b: &Ciphertext<T>, ek: &EvaluationKey) -> Ciphertext<T>
+    pub fn or<T>(
+        &mut self,
+        a: &Ciphertext<T>,
+        b: &Ciphertext<T>,
+        ek: &EvaluationKey,
+    ) -> Ciphertext<T>
     where
         T: UnsignedInteger,
         FheUint<Vec<u8>, T>: Or<T, crate::backend::BE>,
@@ -387,7 +416,12 @@ impl Context {
     }
 
     /// Homomorphic bitwise XOR: `a ^ b`.
-    pub fn xor<T>(&mut self, a: &Ciphertext<T>, b: &Ciphertext<T>, ek: &EvaluationKey) -> Ciphertext<T>
+    pub fn xor<T>(
+        &mut self,
+        a: &Ciphertext<T>,
+        b: &Ciphertext<T>,
+        ek: &EvaluationKey,
+    ) -> Ciphertext<T>
     where
         T: UnsignedInteger,
         FheUint<Vec<u8>, T>: Xor<T, crate::backend::BE>,
@@ -398,7 +432,12 @@ impl Context {
     }
 
     /// Homomorphic logical left shift: `a << b`.
-    pub fn sll<T>(&mut self, a: &Ciphertext<T>, b: &Ciphertext<T>, ek: &EvaluationKey) -> Ciphertext<T>
+    pub fn sll<T>(
+        &mut self,
+        a: &Ciphertext<T>,
+        b: &Ciphertext<T>,
+        ek: &EvaluationKey,
+    ) -> Ciphertext<T>
     where
         T: UnsignedInteger,
         FheUint<Vec<u8>, T>: Sll<T, crate::backend::BE>,
@@ -409,7 +448,12 @@ impl Context {
     }
 
     /// Homomorphic logical right shift: `a >> b` (zero-extending).
-    pub fn srl<T>(&mut self, a: &Ciphertext<T>, b: &Ciphertext<T>, ek: &EvaluationKey) -> Ciphertext<T>
+    pub fn srl<T>(
+        &mut self,
+        a: &Ciphertext<T>,
+        b: &Ciphertext<T>,
+        ek: &EvaluationKey,
+    ) -> Ciphertext<T>
     where
         T: UnsignedInteger,
         FheUint<Vec<u8>, T>: Srl<T, crate::backend::BE>,
@@ -420,7 +464,12 @@ impl Context {
     }
 
     /// Homomorphic arithmetic right shift: `a >> b` (sign-extending).
-    pub fn sra<T>(&mut self, a: &Ciphertext<T>, b: &Ciphertext<T>, ek: &EvaluationKey) -> Ciphertext<T>
+    pub fn sra<T>(
+        &mut self,
+        a: &Ciphertext<T>,
+        b: &Ciphertext<T>,
+        ek: &EvaluationKey,
+    ) -> Ciphertext<T>
     where
         T: UnsignedInteger,
         FheUint<Vec<u8>, T>: Sra<T, crate::backend::BE>,
@@ -431,7 +480,12 @@ impl Context {
     }
 
     /// Homomorphic signed less-than: result is `1` if `(a as signed) < (b as signed)`, else `0`.
-    pub fn slt<T>(&mut self, a: &Ciphertext<T>, b: &Ciphertext<T>, ek: &EvaluationKey) -> Ciphertext<T>
+    pub fn slt<T>(
+        &mut self,
+        a: &Ciphertext<T>,
+        b: &Ciphertext<T>,
+        ek: &EvaluationKey,
+    ) -> Ciphertext<T>
     where
         T: UnsignedInteger,
         FheUint<Vec<u8>, T>: Slt<T, crate::backend::BE>,
@@ -442,7 +496,12 @@ impl Context {
     }
 
     /// Homomorphic unsigned less-than: result is `1` if `a < b`, else `0`.
-    pub fn sltu<T>(&mut self, a: &Ciphertext<T>, b: &Ciphertext<T>, ek: &EvaluationKey) -> Ciphertext<T>
+    pub fn sltu<T>(
+        &mut self,
+        a: &Ciphertext<T>,
+        b: &Ciphertext<T>,
+        ek: &EvaluationKey,
+    ) -> Ciphertext<T>
     where
         T: UnsignedInteger,
         FheUint<Vec<u8>, T>: Sltu<T, crate::backend::BE>,
@@ -498,10 +557,17 @@ fn compute_arena_bytes(module: &Mod, params: &Params) -> usize {
     .max()
     .unwrap_or(0);
 
-    [keygen_encrypt, keygen_prepare, fhe_prepare, encrypt, decrypt, eval]
-        .into_iter()
-        .max()
-        .unwrap_or(0)
+    [
+        keygen_encrypt,
+        keygen_prepare,
+        fhe_prepare,
+        encrypt,
+        decrypt,
+        eval,
+    ]
+    .into_iter()
+    .max()
+    .unwrap_or(0)
 }
 
 /// Construct a [`Source`] seeded from OS randomness.

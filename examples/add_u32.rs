@@ -31,6 +31,9 @@ fn main() {
 
     println!("Result:   {result}");
     println!("Expected: {expected}");
-    assert_eq!(result, expected, "decrypted result does not match plaintext computation");
+    assert_eq!(
+        result, expected,
+        "decrypted result does not match plaintext computation"
+    );
     println!("OK");
 }
