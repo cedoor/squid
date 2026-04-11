@@ -2,16 +2,16 @@
  
 **An ergonomic Rust wrapper for [Poulpy](https://github.com/phantomzone-org/poulpy), making Fully Homomorphic Encryption accessible without sacrificing control.**
  
-[![Crates.io](https://img.shields.io/crates/v/squid-fhe.svg)](https://crates.io/crates/squid-fhe) [![docs.rs](https://img.shields.io/docsrs/squid-fhe)](https://docs.rs/squid-fhe) [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![CI](https://github.com/cedoor/squid/actions/workflows/ci.yml/badge.svg)](https://github.com/cedoor/squid/actions) ![Status](https://img.shields.io/badge/status-early%20development-orange)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![CI](https://github.com/cedoor/squid/actions/workflows/ci.yml/badge.svg)](https://github.com/cedoor/squid/actions) ![Status](https://img.shields.io/badge/status-early%20development-orange)
 
-Poulpy is a low-level, modular toolkit exposing the full machinery of lattice-based homomorphic encryption. That power comes with sharp edges: manual scratch arenas, explicit lifecycle transitions, trait-heavy APIs. `squid-fhe` wraps Poulpy with a smaller, opinionated surface so you can write FHE programs without managing every byte of workspace memory or tracking which representation a ciphertext currently lives in.
+Poulpy is a low-level, modular toolkit exposing the full machinery of lattice-based homomorphic encryption. That power comes with sharp edges: manual scratch arenas, explicit lifecycle transitions, trait-heavy APIs. `squid` wraps Poulpy with a smaller, opinionated surface so you can write FHE programs without managing every byte of workspace memory or tracking which representation a ciphertext currently lives in.
 
 **Current scope:** `squid` wraps Poulpy's `bin_fhe::bdd_arithmetic` layer: gate-level FHE on encrypted unsigned integers (`u8`, `u16`, `u32`). This is the only fully exposed end-to-end capability in `poulpy-schemes` today. The API will expand as Poulpy adds more scheme-level implementations.
 
 ## Usage
 
 ```rust
-use squid_fhe::{Context, Params};
+use squid::{Context, Params};
 
 fn main() {
     // Demo preset — not a vetted security level (see Params::unsecure docs)
