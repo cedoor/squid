@@ -1,4 +1,4 @@
-# 🦑 SquidFHE
+# 🦑 Squid
  
 **An ergonomic Rust wrapper for [Poulpy](https://github.com/phantomzone-org/poulpy), making Fully Homomorphic Encryption accessible without sacrificing control.**
  
