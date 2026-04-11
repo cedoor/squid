@@ -1,8 +1,8 @@
-# squid
-
-An ergonomic Rust wrapper for [Poulpy](https://github.com/phantomzone-org/poulpy) FHE.
-
-![Status: early development](https://img.shields.io/badge/status-early%20development-orange)
+# 🦑 Squid
+ 
+**An ergonomic Rust wrapper for [Poulpy](https://github.com/phantomzone-org/poulpy), making Fully Homomorphic Encryption accessible without sacrificing control.**
+ 
+[![Crates.io](https://img.shields.io/crates/v/squid.svg)](https://crates.io/crates/squid) [![docs.rs](https://img.shields.io/docsrs/squid)](https://docs.rs/squid) [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![CI](https://github.com/cedoor/squid/actions/workflows/ci.yml/badge.svg)](https://github.com/cedoor/squid/actions) ![Status](https://img.shields.io/badge/status-early%20development-orange)
 
 Poulpy is a low-level, modular toolkit exposing the full machinery of lattice-based homomorphic encryption. That power comes with sharp edges: manual scratch arenas, explicit lifecycle transitions, trait-heavy APIs. `squid` wraps Poulpy with a smaller, opinionated surface so you can write FHE programs without managing every byte of workspace memory or tracking which representation a ciphertext currently lives in.
 
