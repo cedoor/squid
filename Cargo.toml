@@ -3,6 +3,7 @@ name = "squid"
 version = "0.1.0"
 edition = "2021"
 description = "An ergonomic Rust wrapper for Poulpy FHE."
+license = "MIT"
 
 [features]
 backend-avx = ["dep:poulpy-cpu-avx"]
