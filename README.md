@@ -68,23 +68,31 @@ The public API is identical regardless of which backend is selected.
 
 ## Roadmap
 
-### [Milestone 1 — Working Foundation](https://github.com/cedoor/squid/milestone/1)
+### Milestone 1 — Working Foundation: [#1](https://github.com/cedoor/squid/milestone/1)
 
-- [x] [#2 Write README with installation, quick start example](https://github.com/cedoor/squid/issues/2)
-- [x] [#3 Set up GitHub Actions (cargo test, cargo clippy, cargo fmt check)](https://github.com/cedoor/squid/issues/3)
-- [x] [#5 Release first alpha version](https://github.com/cedoor/squid/issues/5)
-- [x] [#7 Add at least one runnable example in examples/](https://github.com/cedoor/squid/issues/7)
-- [ ] [#4 Add tests for all existing ops](https://github.com/cedoor/squid/issues/4)
-- [ ] [#6 Add rustdoc comments to all public items](https://github.com/cedoor/squid/issues/6)
+- [x] Write README with installation, quick start example: [#2](https://github.com/cedoor/squid/issues/2)
+- [x] Set up GitHub Actions (cargo test, cargo clippy, cargo fmt check): [#3](https://github.com/cedoor/squid/issues/3)
+- [x] Release first alpha version: [#5](https://github.com/cedoor/squid/issues/5)
+- [x] Add at least one runnable example in examples/: [#7](https://github.com/cedoor/squid/issues/7)
+- [ ] Add tests for all existing ops: [#4](https://github.com/cedoor/squid/issues/4)
+- [ ] Add rustdoc comments to all public items: [#6](https://github.com/cedoor/squid/issues/6)
 
-### [Milestone 2 — Full bin_fhe Coverage](https://github.com/cedoor/squid/milestone/2)
+### Milestone 2 — Full bin_fhe Coverage: [#2](https://github.com/cedoor/squid/milestone/2)
 
-- [ ] [#8 Wrap Poulpy's blind selection / retrieval primitives](https://github.com/cedoor/squid/issues/8)
-- [ ] [#9 Multi-threaded evaluation](https://github.com/cedoor/squid/issues/9)
-- [ ] [#10 Sub-word operations](https://github.com/cedoor/squid/issues/10)
-- [ ] [#11 Identity / noise refresh](https://github.com/cedoor/squid/issues/11)
-- [ ] [#12 NTT backend](https://github.com/cedoor/squid/issues/12)
-- [ ] [#13 Key serialization](https://github.com/cedoor/squid/issues/13)
+- [ ] Wrap Poulpy's blind selection / retrieval primitives: [#8](https://github.com/cedoor/squid/issues/8)
+- [ ] Multi-threaded evaluation: [#9](https://github.com/cedoor/squid/issues/9)
+- [ ] Sub-word operations: [#10](https://github.com/cedoor/squid/issues/10)
+- [ ] Identity / noise refresh: [#11](https://github.com/cedoor/squid/issues/11)
+- [ ] NTT backend: [#12](https://github.com/cedoor/squid/issues/12)
+- [ ] Key serialization: [#13](https://github.com/cedoor/squid/issues/13)
+
+### Milestone 3 — Developer Experience: [#3](https://github.com/cedoor/squid/milestone/3)
+
+- [ ] WASM crate: [#14](https://github.com/cedoor/squid/issues/14)
+- [ ] Params validation with clear error messages: [#15](https://github.com/cedoor/squid/issues/15)
+- [ ] Realistic examples: [#16](https://github.com/cedoor/squid/issues/16)
+- [ ] Benchmarks: [#17](https://github.com/cedoor/squid/issues/17)
+- [ ] Vetted Params presets: [#18](https://github.com/cedoor/squid/issues/18)
 
 ## Design goals
 
