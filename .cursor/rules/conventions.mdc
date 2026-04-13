@@ -25,3 +25,12 @@ Poulpy panics on parameter mismatches and scratch underflow — those are progra
 ## Naming
 
 Stay close to Poulpy's vocabulary when naming wrapper types so users who read Poulpy docs can map concepts across (e.g. `EvaluationKey` maps to `BDDKey`, `SecretKey` maps to `GLWESecret + LWESecret`).
+
+## User-facing choices
+
+Every feature that gives the end user a choice must have a sensible default that works without configuration. Alternatives (e.g. feature flags, optional parameters, variant constructors) must be documented with:
+- what the alternative does differently from the default
+- when the user should prefer it over the default
+- any trade-offs or requirements (e.g. hardware, security implications, performance cost)
+
+A new choice without this documentation must not be merged.

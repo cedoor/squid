@@ -36,7 +36,7 @@ fn main() {
 
 ## Operations
 
-All operations work on `Ciphertext<T>` where `T` is `u8`, `u16`, or `u32`:
+All operations currently require `T = u32` (the only width with compiled BDD circuits in Poulpy). Encrypt and decrypt work for `u8`, `u16`, and `u32`.
 
 | Method | Description |
 |---|---|
@@ -66,9 +66,30 @@ RUSTFLAGS="-C target-cpu=native" cargo build --release --features backend-avx
 
 The public API is identical regardless of which backend is selected.
 
+## Roadmap
+
+### [Milestone 1 — Working Foundation](https://github.com/cedoor/squid/milestone/1)
+
+- [x] [#2 Write README with installation, quick start example](https://github.com/cedoor/squid/issues/2)
+- [x] [#3 Set up GitHub Actions (cargo test, cargo clippy, cargo fmt check)](https://github.com/cedoor/squid/issues/3)
+- [x] [#5 Release first alpha version](https://github.com/cedoor/squid/issues/5)
+- [x] [#7 Add at least one runnable example in examples/](https://github.com/cedoor/squid/issues/7)
+- [ ] [#4 Add tests for all existing ops](https://github.com/cedoor/squid/issues/4)
+- [ ] [#6 Add rustdoc comments to all public items](https://github.com/cedoor/squid/issues/6)
+
+### [Milestone 2 — Full bin_fhe Coverage](https://github.com/cedoor/squid/milestone/2)
+
+- [ ] [#8 Wrap Poulpy's blind selection / retrieval primitives](https://github.com/cedoor/squid/issues/8)
+- [ ] [#9 Multi-threaded evaluation](https://github.com/cedoor/squid/issues/9)
+- [ ] [#10 Sub-word operations](https://github.com/cedoor/squid/issues/10)
+- [ ] [#11 Identity / noise refresh](https://github.com/cedoor/squid/issues/11)
+- [ ] [#12 NTT backend](https://github.com/cedoor/squid/issues/12)
+- [ ] [#13 Key serialization](https://github.com/cedoor/squid/issues/13)
+
 ## Design goals
 
 - **Hide scratch management.** Callers never allocate or thread scratch buffers.
 - **Hide lifecycle transitions.** The Standard → Prepared → BDD-eval pipeline is handled internally; users see one coherent `Ciphertext<T>` type.
 - **Explicitly non-production defaults.** `Params::unsecure()` matches Poulpy's `bdd_arithmetic` example for demos; treat it as unaudited unless you analyse parameters yourself.
 - **No magic.** Every abstraction is traceable to the underlying Poulpy call. No hidden global state, no surprising allocations beyond the initial `Context::new`.
+- **Safe defaults.** Every user-facing choice has a default that works without configuration. Alternatives are documented with their trade-offs and the conditions under which they should be preferred.
