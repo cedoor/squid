@@ -266,8 +266,7 @@ impl Context {
         assert_eval_threads(options.eval_threads);
         self.options = options;
         if self.params.scratch_bytes.is_none() {
-            let bytes =
-                compute_arena_bytes(&self.module, &self.params, self.options.eval_threads);
+            let bytes = compute_arena_bytes(&self.module, &self.params, self.options.eval_threads);
             self.arena = scratch::new_arena(bytes);
         }
         self
@@ -292,8 +291,7 @@ impl Context {
         assert_eval_threads(options.eval_threads);
         self.options = options;
         if self.params.scratch_bytes.is_none() {
-            let bytes =
-                compute_arena_bytes(&self.module, &self.params, self.options.eval_threads);
+            let bytes = compute_arena_bytes(&self.module, &self.params, self.options.eval_threads);
             self.arena = scratch::new_arena(bytes);
         }
     }
