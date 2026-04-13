@@ -80,7 +80,7 @@ The public API is identical regardless of which backend is selected.
 ### Milestone 2 — Full bin_fhe Coverage: [#2](https://github.com/cedoor/squid/milestone/2)
 
 - [ ] Wrap Poulpy's blind selection / retrieval primitives: [#8](https://github.com/cedoor/squid/issues/8)
-- [ ] Multi-threaded evaluation: [#9](https://github.com/cedoor/squid/issues/9)
+- [x] Multi-threaded evaluation: [#9](https://github.com/cedoor/squid/issues/9)
 - [ ] Sub-word operations: [#10](https://github.com/cedoor/squid/issues/10)
 - [ ] Identity / noise refresh: [#11](https://github.com/cedoor/squid/issues/11)
 - [ ] NTT backend: [#12](https://github.com/cedoor/squid/issues/12)
