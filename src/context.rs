@@ -6,9 +6,9 @@
 //! ## Typical workflow
 //!
 //! ```rust,no_run
-//! use squid::{Context, Params};
+//! use squid::{Context, ContextOptions, Params};
 //!
-//! let mut ctx = Context::new(Params::unsecure());
+//! let mut ctx = Context::new(Params::unsecure()).with_options(ContextOptions::default());
 //! let (sk, ek) = ctx.keygen();
 //!
 //! let a = ctx.encrypt::<u32>(42, &sk);
@@ -47,6 +47,32 @@ use crate::{
 /// No generic backend parameter surfaces in squid's public API.
 type Mod = Module<crate::backend::BE>;
 
+#[inline]
+fn assert_eval_threads(n: usize) {
+    assert!(n >= 1, "eval_threads must be >= 1, got {n}");
+}
+
+// ── ContextOptions ───────────────────────────────────────────────────────────
+
+/// Runtime options for a [`Context`], separate from cryptographic [`Params`].
+///
+/// Pass to [`Context::with_options`] after [`Context::new`], or use
+/// [`ContextOptions::default`] for single-threaded BDD evaluation.  Invalid
+/// `eval_threads` (0) is rejected when options are applied ([`Context::with_options`],
+/// [`Context::set_options`], [`Params::min_scratch_bytes`]).
+#[derive(Debug, Clone)]
+pub struct ContextOptions {
+    /// OS threads used for BDD circuit evaluation (CMux phase) on homomorphic
+    /// binary ops.  **Default 1.**
+    pub eval_threads: usize,
+}
+
+impl Default for ContextOptions {
+    fn default() -> Self {
+        Self { eval_threads: 1 }
+    }
+}
+
 // ── Params ───────────────────────────────────────────────────────────────────
 
 /// Parameter set for a [`Context`].
@@ -55,9 +81,10 @@ type Mod = Module<crate::backend::BE>;
 /// evaluation.  [`Params::unsecure`] matches Poulpy's `bdd_arithmetic` example
 /// (n = 1024) and is **not** presented as a vetted security level.
 ///
-/// Advanced users may construct custom `Params` directly, but must ensure
-/// consistency across all layout fields — concretely, `n_glwe`, `base2k`, and
-/// `rank` must agree everywhere they appear.
+/// Advanced users may construct custom `Params` directly (often with struct
+/// update syntax, e.g. `Params { n_glwe: 2048, ..Params::unsecure() }`), but
+/// must ensure consistency across all layout fields — concretely, `n_glwe`,
+/// `base2k`, and `rank` must agree everywhere they appear.
 #[derive(Debug, Clone)]
 pub struct Params {
     /// GLWE ring degree (must be a power of two; determines the ring Z_q[X]/(X^n+1)).
@@ -161,6 +188,23 @@ impl Params {
             scratch_bytes: None,
         }
     }
+
+    /// Minimum scratch arena size (in bytes) for this [`Params`] bundle with
+    /// the given [`ContextOptions`] (e.g. multi-threaded BDD evaluation).
+    ///
+    /// Use with [`Params::scratch_bytes`] when you need an explicit size, or
+    /// leave `scratch_bytes` as `None` so [`Context::new`] sizes the arena
+    /// automatically (using the options passed to [`Context::with_options`], or
+    /// [`ContextOptions::default`]).
+    ///
+    /// # Panics
+    ///
+    /// If `options.eval_threads` is zero.
+    pub fn min_scratch_bytes(&self, options: &ContextOptions) -> usize {
+        assert_eval_threads(options.eval_threads);
+        let module = Mod::new(self.n_glwe as u64);
+        compute_arena_bytes(&module, self, options.eval_threads)
+    }
 }
 
 // ── Context ──────────────────────────────────────────────────────────────────
@@ -180,23 +224,75 @@ pub struct Context {
     params: Params,
     module: Mod,
     arena: scratch::Arena,
+    options: ContextOptions,
 }
 
 impl Context {
     /// Create a new context with the given parameter set.
     ///
+    /// Uses [`ContextOptions::default`] (single-threaded BDD evaluation).  Chain
+    /// [`Context::with_options`] to change that, e.g.
+    /// `Context::new(params).with_options(ContextOptions { eval_threads: 4, ..Default::default() })`.
+    ///
     /// Allocates the FFT tables and scratch arena.  This is the most expensive
     /// one-time setup cost; key generation and evaluation are the runtime costs.
     pub fn new(params: Params) -> Self {
+        let options = ContextOptions::default();
+        assert_eval_threads(options.eval_threads);
         let module = Mod::new(params.n_glwe as u64);
         let bytes = params
             .scratch_bytes
-            .unwrap_or_else(|| compute_arena_bytes(&module, &params));
+            .unwrap_or_else(|| compute_arena_bytes(&module, &params, options.eval_threads));
         let arena = scratch::new_arena(bytes);
         Context {
             params,
             module,
             arena,
+            options,
+        }
+    }
+
+    /// Applies runtime options, replacing any previous [`ContextOptions`].
+    ///
+    /// If [`Params::scratch_bytes`] is `None`, reallocates the scratch arena to
+    /// match (via [`Params::min_scratch_bytes`]).  If `scratch_bytes` was set
+    /// explicitly, the arena is **not** resized; ensure it remains large enough,
+    /// or BDD evaluation may panic.
+    ///
+    /// # Panics
+    ///
+    /// If `options.eval_threads` is zero.
+    pub fn with_options(mut self, options: ContextOptions) -> Self {
+        assert_eval_threads(options.eval_threads);
+        self.options = options;
+        if self.params.scratch_bytes.is_none() {
+            let bytes = compute_arena_bytes(&self.module, &self.params, self.options.eval_threads);
+            self.arena = scratch::new_arena(bytes);
+        }
+        self
+    }
+
+    /// Returns a copy of the current [`ContextOptions`].
+    pub fn options(&self) -> ContextOptions {
+        self.options.clone()
+    }
+
+    /// BDD evaluation thread count from the active [`ContextOptions`].
+    pub fn eval_threads(&self) -> usize {
+        self.options.eval_threads
+    }
+
+    /// Updates runtime options in place (same rules as [`Context::with_options`]).
+    ///
+    /// # Panics
+    ///
+    /// If `options.eval_threads` is zero.
+    pub fn set_options(&mut self, options: ContextOptions) {
+        assert_eval_threads(options.eval_threads);
+        self.options = options;
+        if self.params.scratch_bytes.is_none() {
+            let bytes = compute_arena_bytes(&self.module, &self.params, self.options.eval_threads);
+            self.arena = scratch::new_arena(bytes);
         }
     }
 
@@ -299,6 +395,8 @@ impl Context {
     /// 1. Allocate and populate `FheUintPrepared` for `a` and `b`.
     /// 2. Allocate output `FheUint`.
     /// 3. Invoke `op` on it.
+    ///
+    /// Uses [`ContextOptions::eval_threads`] for Poulpy's `*_multi_thread` BDD evaluators.
     fn eval_binary<T, F>(
         &mut self,
         a: &Ciphertext<T>,
@@ -310,6 +408,7 @@ impl Context {
         T: UnsignedInteger,
         F: FnOnce(
             &Mod,
+            usize,
             &mut FheUint<Vec<u8>, T>,
             &FheUintPrepared<Vec<u8>, T, crate::backend::BE>,
             &FheUintPrepared<Vec<u8>, T, crate::backend::BE>,
@@ -317,6 +416,7 @@ impl Context {
             &mut poulpy_hal::layouts::Scratch<crate::backend::BE>,
         ),
     {
+        let eval_threads = self.options.eval_threads;
         let mut a_prep: FheUintPrepared<Vec<u8>, T, crate::backend::BE> =
             FheUintPrepared::alloc_from_infos(&self.module, &self.params.ggsw_layout);
         a_prep.prepare::<CGGI, _, _, _, _>(
@@ -338,6 +438,7 @@ impl Context {
         let mut out: FheUint<Vec<u8>, T> = FheUint::alloc_from_infos(&self.params.glwe_layout);
         op(
             &self.module,
+            eval_threads,
             &mut out,
             &a_prep,
             &b_prep,
@@ -360,8 +461,8 @@ impl Context {
         T: UnsignedInteger,
         FheUint<Vec<u8>, T>: Add<T, crate::backend::BE>,
     {
-        self.eval_binary(a, b, ek, |module, out, ap, bp, key, scratch| {
-            out.add(module, ap, bp, key, scratch);
+        self.eval_binary(a, b, ek, |module, threads, out, ap, bp, key, scratch| {
+            out.add_multi_thread(threads, module, ap, bp, key, scratch);
         })
     }
 
@@ -376,8 +477,8 @@ impl Context {
         T: UnsignedInteger,
         FheUint<Vec<u8>, T>: Sub<T, crate::backend::BE>,
     {
-        self.eval_binary(a, b, ek, |module, out, ap, bp, key, scratch| {
-            out.sub(module, ap, bp, key, scratch);
+        self.eval_binary(a, b, ek, |module, threads, out, ap, bp, key, scratch| {
+            out.sub_multi_thread(threads, module, ap, bp, key, scratch);
         })
     }
 
@@ -392,8 +493,8 @@ impl Context {
         T: UnsignedInteger,
         FheUint<Vec<u8>, T>: And<T, crate::backend::BE>,
     {
-        self.eval_binary(a, b, ek, |module, out, ap, bp, key, scratch| {
-            out.and(module, ap, bp, key, scratch);
+        self.eval_binary(a, b, ek, |module, threads, out, ap, bp, key, scratch| {
+            out.and_multi_thread(threads, module, ap, bp, key, scratch);
         })
     }
 
@@ -408,8 +509,8 @@ impl Context {
         T: UnsignedInteger,
         FheUint<Vec<u8>, T>: Or<T, crate::backend::BE>,
     {
-        self.eval_binary(a, b, ek, |module, out, ap, bp, key, scratch| {
-            out.or(module, ap, bp, key, scratch);
+        self.eval_binary(a, b, ek, |module, threads, out, ap, bp, key, scratch| {
+            out.or_multi_thread(threads, module, ap, bp, key, scratch);
         })
     }
 
@@ -424,8 +525,8 @@ impl Context {
         T: UnsignedInteger,
         FheUint<Vec<u8>, T>: Xor<T, crate::backend::BE>,
     {
-        self.eval_binary(a, b, ek, |module, out, ap, bp, key, scratch| {
-            out.xor(module, ap, bp, key, scratch);
+        self.eval_binary(a, b, ek, |module, threads, out, ap, bp, key, scratch| {
+            out.xor_multi_thread(threads, module, ap, bp, key, scratch);
         })
     }
 
@@ -440,8 +541,8 @@ impl Context {
         T: UnsignedInteger,
         FheUint<Vec<u8>, T>: Sll<T, crate::backend::BE>,
     {
-        self.eval_binary(a, b, ek, |module, out, ap, bp, key, scratch| {
-            out.sll(module, ap, bp, key, scratch);
+        self.eval_binary(a, b, ek, |module, threads, out, ap, bp, key, scratch| {
+            out.sll_multi_thread(threads, module, ap, bp, key, scratch);
         })
     }
 
@@ -456,8 +557,8 @@ impl Context {
         T: UnsignedInteger,
         FheUint<Vec<u8>, T>: Srl<T, crate::backend::BE>,
     {
-        self.eval_binary(a, b, ek, |module, out, ap, bp, key, scratch| {
-            out.srl(module, ap, bp, key, scratch);
+        self.eval_binary(a, b, ek, |module, threads, out, ap, bp, key, scratch| {
+            out.srl_multi_thread(threads, module, ap, bp, key, scratch);
         })
     }
 
@@ -472,8 +573,8 @@ impl Context {
         T: UnsignedInteger,
         FheUint<Vec<u8>, T>: Sra<T, crate::backend::BE>,
     {
-        self.eval_binary(a, b, ek, |module, out, ap, bp, key, scratch| {
-            out.sra(module, ap, bp, key, scratch);
+        self.eval_binary(a, b, ek, |module, threads, out, ap, bp, key, scratch| {
+            out.sra_multi_thread(threads, module, ap, bp, key, scratch);
         })
     }
 
@@ -488,8 +589,8 @@ impl Context {
         T: UnsignedInteger,
         FheUint<Vec<u8>, T>: Slt<T, crate::backend::BE>,
     {
-        self.eval_binary(a, b, ek, |module, out, ap, bp, key, scratch| {
-            out.slt(module, ap, bp, key, scratch);
+        self.eval_binary(a, b, ek, |module, threads, out, ap, bp, key, scratch| {
+            out.slt_multi_thread(threads, module, ap, bp, key, scratch);
         })
     }
 
@@ -504,8 +605,8 @@ impl Context {
         T: UnsignedInteger,
         FheUint<Vec<u8>, T>: Sltu<T, crate::backend::BE>,
     {
-        self.eval_binary(a, b, ek, |module, out, ap, bp, key, scratch| {
-            out.sltu(module, ap, bp, key, scratch);
+        self.eval_binary(a, b, ek, |module, threads, out, ap, bp, key, scratch| {
+            out.sltu_multi_thread(threads, module, ap, bp, key, scratch);
         })
     }
 }
@@ -516,7 +617,7 @@ impl Context {
 /// pipeline by taking the `max` across every scratch-taking category.
 /// The arena is reused sequentially, so the worst-case single operation
 /// determines the required size.
-fn compute_arena_bytes(module: &Mod, params: &Params) -> usize {
+fn compute_arena_bytes(module: &Mod, params: &Params, eval_threads: usize) -> usize {
     let keygen_encrypt = module.bdd_key_encrypt_sk_tmp_bytes(&params.bdd_layout);
     let keygen_prepare = module.prepare_bdd_key_tmp_bytes(&params.bdd_layout);
     let fhe_prepare = module.fhe_uint_prepare_tmp_bytes(
@@ -541,17 +642,18 @@ fn compute_arena_bytes(module: &Mod, params: &Params) -> usize {
         BDDKeyPrepared::alloc_from_infos(module, &params.bdd_layout);
     let g = &params.ggsw_layout;
     let r = &params.glwe_layout;
+    let t = eval_threads;
     let eval = [
-        dummy.add_tmp_bytes(module, r, g, &bdd_key_prepared),
-        dummy.sub_tmp_bytes(module, r, g, &bdd_key_prepared),
-        dummy.and_tmp_bytes(module, r, g, &bdd_key_prepared),
-        dummy.or_tmp_bytes(module, r, g, &bdd_key_prepared),
-        dummy.xor_tmp_bytes(module, r, g, &bdd_key_prepared),
-        dummy.sll_tmp_bytes(module, r, g, &bdd_key_prepared),
-        dummy.srl_tmp_bytes(module, r, g, &bdd_key_prepared),
-        dummy.sra_tmp_bytes(module, r, g, &bdd_key_prepared),
-        dummy.slt_tmp_bytes(module, r, g, &bdd_key_prepared),
-        dummy.sltu_tmp_bytes(module, r, g, &bdd_key_prepared),
+        dummy.add_multi_thread_tmp_bytes(module, t, r, g, &bdd_key_prepared),
+        dummy.sub_multi_thread_tmp_bytes(module, t, r, g, &bdd_key_prepared),
+        dummy.and_multi_thread_tmp_bytes(module, t, r, g, &bdd_key_prepared),
+        dummy.or_multi_thread_tmp_bytes(module, t, r, g, &bdd_key_prepared),
+        dummy.xor_multi_thread_tmp_bytes(module, t, r, g, &bdd_key_prepared),
+        dummy.sll_multi_thread_tmp_bytes(module, t, r, g, &bdd_key_prepared),
+        dummy.srl_multi_thread_tmp_bytes(module, t, r, g, &bdd_key_prepared),
+        dummy.sra_multi_thread_tmp_bytes(module, t, r, g, &bdd_key_prepared),
+        dummy.slt_multi_thread_tmp_bytes(module, t, r, g, &bdd_key_prepared),
+        dummy.sltu_multi_thread_tmp_bytes(module, t, r, g, &bdd_key_prepared),
     ]
     .into_iter()
     .max()
