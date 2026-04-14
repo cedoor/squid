@@ -76,6 +76,7 @@ The public API is identical regardless of which backend is selected.
 - [x] Add at least one runnable example in examples/: [#7](https://github.com/cedoor/squid/issues/7)
 - [ ] Add tests for all existing ops: [#4](https://github.com/cedoor/squid/issues/4)
 - [ ] Add rustdoc comments to all public items: [#6](https://github.com/cedoor/squid/issues/6)
+- [ ] Faster tests via fixtures or deterministic keygen: [#19](https://github.com/cedoor/squid/issues/19)
 
 ### Milestone 2 — Full bin_fhe Coverage: [#2](https://github.com/cedoor/squid/milestone/2)
 
@@ -85,16 +86,16 @@ The public API is identical regardless of which backend is selected.
 - [ ] Identity / noise refresh: [#11](https://github.com/cedoor/squid/issues/11)
 - [ ] NTT backend: [#12](https://github.com/cedoor/squid/issues/12)
 - [ ] Key serialization: [#13](https://github.com/cedoor/squid/issues/13)
-- [ ] Faster tests via fixtures or deterministic keygen: [#19](https://github.com/cedoor/squid/issues/19)
-- [ ] Refactor `context.rs`: [#20](https://github.com/cedoor/squid/issues/20)
 
-### Milestone 3 — Developer Experience: [#3](https://github.com/cedoor/squid/milestone/3)
+### Milestone 3 — Developer Experience & Optimization: [#3](https://github.com/cedoor/squid/milestone/3)
 
 - [ ] WASM crate: [#14](https://github.com/cedoor/squid/issues/14)
 - [ ] Params validation with clear error messages: [#15](https://github.com/cedoor/squid/issues/15)
 - [ ] Realistic examples: [#16](https://github.com/cedoor/squid/issues/16)
 - [ ] Benchmarks: [#17](https://github.com/cedoor/squid/issues/17)
 - [ ] Vetted Params presets: [#18](https://github.com/cedoor/squid/issues/18)
+- [ ] Refactor `context.rs`: [#20](https://github.com/cedoor/squid/issues/20)
+- [ ] Split keygen scratch from runtime arena to reduce persistent memory: [#22](https://github.com/cedoor/squid/issues/22)
 
 ## Design goals
 
