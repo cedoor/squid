@@ -59,7 +59,7 @@ fn assert_eval_threads(n: usize) {
 /// Pass to [`Context::with_options`] after [`Context::new`], or use
 /// [`ContextOptions::default`] for single-threaded BDD evaluation.  Invalid
 /// `eval_threads` (0) is rejected when options are applied ([`Context::with_options`],
-/// [`Context::set_options`], [`Params::min_scratch_bytes`]).
+/// [`Context::set_options`]).
 #[derive(Debug, Clone)]
 pub struct ContextOptions {
     /// OS threads used for BDD circuit evaluation (CMux phase) on homomorphic
@@ -68,6 +68,9 @@ pub struct ContextOptions {
 }
 
 impl Default for ContextOptions {
+    /// Single-threaded BDD evaluation: no extra OS threads, minimal scratch, and
+    /// the same behavior on any machine.  Higher `eval_threads` can improve
+    /// throughput on multi-core hosts but adds coordination cost and is opt-in.
     fn default() -> Self {
         Self { eval_threads: 1 }
     }
@@ -97,9 +100,6 @@ pub struct Params {
     pub ggsw_layout: GGSWLayout,
     /// Full BDD evaluation key layout.
     pub bdd_layout: BDDKeyLayout,
-    /// Scratch arena size in bytes.  If `None`, computed exactly from the
-    /// parameter set via the Poulpy `*_tmp_bytes` methods.
-    pub scratch_bytes: Option<usize>,
 }
 
 impl Params {
@@ -185,25 +185,7 @@ impl Params {
             glwe_layout,
             ggsw_layout,
             bdd_layout,
-            scratch_bytes: None,
         }
-    }
-
-    /// Minimum scratch arena size (in bytes) for this [`Params`] bundle with
-    /// the given [`ContextOptions`] (e.g. multi-threaded BDD evaluation).
-    ///
-    /// Use with [`Params::scratch_bytes`] when you need an explicit size, or
-    /// leave `scratch_bytes` as `None` so [`Context::new`] sizes the arena
-    /// automatically (using the options passed to [`Context::with_options`], or
-    /// [`ContextOptions::default`]).
-    ///
-    /// # Panics
-    ///
-    /// If `options.eval_threads` is zero.
-    pub fn min_scratch_bytes(&self, options: &ContextOptions) -> usize {
-        assert_eval_threads(options.eval_threads);
-        let module = Mod::new(self.n_glwe as u64);
-        compute_arena_bytes(&module, self, options.eval_threads)
     }
 }
 
@@ -232,7 +214,7 @@ impl Context {
     ///
     /// Uses [`ContextOptions::default`] (single-threaded BDD evaluation).  Chain
     /// [`Context::with_options`] to change that, e.g.
-    /// `Context::new(params).with_options(ContextOptions { eval_threads: 4, ..Default::default() })`.
+    /// `Context::new(params).with_options(ContextOptions { eval_threads: 4 })`.
     ///
     /// Allocates the FFT tables and scratch arena.  This is the most expensive
     /// one-time setup cost; key generation and evaluation are the runtime costs.
@@ -240,9 +222,7 @@ impl Context {
         let options = ContextOptions::default();
         assert_eval_threads(options.eval_threads);
         let module = Mod::new(params.n_glwe as u64);
-        let bytes = params
-            .scratch_bytes
-            .unwrap_or_else(|| compute_arena_bytes(&module, &params, options.eval_threads));
+        let bytes = compute_arena_bytes(&module, &params, options.eval_threads);
         let arena = scratch::new_arena(bytes);
         Context {
             params,
@@ -254,10 +234,8 @@ impl Context {
 
     /// Applies runtime options, replacing any previous [`ContextOptions`].
     ///
-    /// If [`Params::scratch_bytes`] is `None`, reallocates the scratch arena to
-    /// match (via [`Params::min_scratch_bytes`]).  If `scratch_bytes` was set
-    /// explicitly, the arena is **not** resized; ensure it remains large enough,
-    /// or BDD evaluation may panic.
+    /// Reallocates the scratch arena for this [`Params`] and the new
+    /// [`ContextOptions::eval_threads`] (worst-case size from Poulpy’s scratch helpers).
     ///
     /// # Panics
     ///
@@ -265,10 +243,9 @@ impl Context {
     pub fn with_options(mut self, options: ContextOptions) -> Self {
         assert_eval_threads(options.eval_threads);
         self.options = options;
-        if self.params.scratch_bytes.is_none() {
-            let bytes = compute_arena_bytes(&self.module, &self.params, self.options.eval_threads);
-            self.arena = scratch::new_arena(bytes);
-        }
+        let bytes =
+            compute_arena_bytes(&self.module, &self.params, self.options.eval_threads);
+        self.arena = scratch::new_arena(bytes);
         self
     }
 
@@ -290,10 +267,32 @@ impl Context {
     pub fn set_options(&mut self, options: ContextOptions) {
         assert_eval_threads(options.eval_threads);
         self.options = options;
-        if self.params.scratch_bytes.is_none() {
-            let bytes = compute_arena_bytes(&self.module, &self.params, self.options.eval_threads);
-            self.arena = scratch::new_arena(bytes);
-        }
+        let bytes =
+            compute_arena_bytes(&self.module, &self.params, self.options.eval_threads);
+        self.arena = scratch::new_arena(bytes);
+    }
+
+    /// Sets only [`ContextOptions::eval_threads`].  Reallocates the scratch arena
+    /// like [`Context::with_options`].
+    ///
+    /// # Panics
+    ///
+    /// If `eval_threads` is zero.
+    pub fn with_eval_threads(self, eval_threads: usize) -> Self {
+        let mut opts = self.options();
+        opts.eval_threads = eval_threads;
+        self.with_options(opts)
+    }
+
+    /// Same as [`Context::with_eval_threads`], in-place (`&mut self`).
+    ///
+    /// # Panics
+    ///
+    /// If `eval_threads` is zero.
+    pub fn set_eval_threads(&mut self, eval_threads: usize) {
+        let mut opts = self.options();
+        opts.eval_threads = eval_threads;
+        self.set_options(opts);
     }
 
     /// Generate a fresh secret key and the corresponding evaluation key.

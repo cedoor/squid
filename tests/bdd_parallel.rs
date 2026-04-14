@@ -1,11 +1,11 @@
-use squid::{Context, ContextOptions, Params};
+use squid::{Context, Params};
 
 #[test]
 fn eval_threads_two_matches_one() {
     let params = Params::unsecure();
 
     let mut ctx1 = Context::new(params.clone());
-    let mut ctx2 = Context::new(params).with_options(ContextOptions { eval_threads: 2 });
+    let mut ctx2 = Context::new(params).with_eval_threads(2);
 
     let (sk, ek) = ctx1.keygen();
 
