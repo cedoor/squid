@@ -243,8 +243,7 @@ impl Context {
     pub fn with_options(mut self, options: ContextOptions) -> Self {
         assert_eval_threads(options.eval_threads);
         self.options = options;
-        let bytes =
-            compute_arena_bytes(&self.module, &self.params, self.options.eval_threads);
+        let bytes = compute_arena_bytes(&self.module, &self.params, self.options.eval_threads);
         self.arena = scratch::new_arena(bytes);
         self
     }
@@ -267,8 +266,7 @@ impl Context {
     pub fn set_options(&mut self, options: ContextOptions) {
         assert_eval_threads(options.eval_threads);
         self.options = options;
-        let bytes =
-            compute_arena_bytes(&self.module, &self.params, self.options.eval_threads);
+        let bytes = compute_arena_bytes(&self.module, &self.params, self.options.eval_threads);
         self.arena = scratch::new_arena(bytes);
     }
 
