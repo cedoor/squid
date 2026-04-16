@@ -7,3 +7,6 @@
 
 # macOS
 .DS_Store
+
+# Fixtures for integration tests
+tests/fixtures/

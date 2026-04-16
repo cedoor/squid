@@ -76,7 +76,7 @@ The public API is identical regardless of which backend is selected.
 - [x] Add at least one runnable example in examples/: [#7](https://github.com/cedoor/squid/issues/7)
 - [ ] Add tests for all existing ops: [#4](https://github.com/cedoor/squid/issues/4)
 - [ ] Add rustdoc comments to all public items: [#6](https://github.com/cedoor/squid/issues/6)
-- [ ] Faster tests via fixtures or deterministic keygen: [#19](https://github.com/cedoor/squid/issues/19)
+- [x] Faster tests via fixtures or deterministic keygen: [#19](https://github.com/cedoor/squid/issues/19)
 
 ### Milestone 2 — Full bin_fhe Coverage: [#2](https://github.com/cedoor/squid/milestone/2)
 
