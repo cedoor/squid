@@ -9,8 +9,12 @@ fn keygen_serialize_roundtrip_from_os_random() {
     let sk_blob = ctx.serialize_secret_key(&sk).expect("serialize sk");
     let ek_blob = ctx.serialize_evaluation_key(&ek).expect("serialize ek");
 
-    let sk2 = ctx.deserialize_secret_key(&sk_blob).expect("deserialize sk");
-    let ek2 = ctx.deserialize_evaluation_key(&ek_blob).expect("deserialize ek");
+    let sk2 = ctx
+        .deserialize_secret_key(&sk_blob)
+        .expect("deserialize sk");
+    let ek2 = ctx
+        .deserialize_evaluation_key(&ek_blob)
+        .expect("deserialize ek");
 
     let a = ctx.encrypt::<u32>(11, &sk2);
     let b = ctx.encrypt::<u32>(22, &sk2);
