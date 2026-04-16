@@ -9,9 +9,9 @@ license = "MIT"
 backend-avx = ["dep:poulpy-cpu-avx"]
 
 [dependencies]
-poulpy-core = { git = "https://github.com/phantomzone-org/poulpy", branch = "main" }
-poulpy-schemes = { git = "https://github.com/phantomzone-org/poulpy", branch = "main" }
-poulpy-hal = { git = "https://github.com/phantomzone-org/poulpy", branch = "main" }
-poulpy-cpu-ref = { git = "https://github.com/phantomzone-org/poulpy", branch = "main" }
-poulpy-cpu-avx = { git = "https://github.com/phantomzone-org/poulpy", branch = "main", optional = true }
+poulpy-core = { git = "https://github.com/cedoor/poulpy.git", branch = "feat/serialization-key-types" }
+poulpy-schemes = { git = "https://github.com/cedoor/poulpy.git", branch = "feat/serialization-key-types" }
+poulpy-hal = { git = "https://github.com/cedoor/poulpy.git", branch = "feat/serialization-key-types" }
+poulpy-cpu-ref = { git = "https://github.com/cedoor/poulpy.git", branch = "feat/serialization-key-types" }
+poulpy-cpu-avx = { git = "https://github.com/cedoor/poulpy.git", branch = "feat/serialization-key-types", optional = true }
 getrandom = "0.3"

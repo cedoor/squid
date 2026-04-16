@@ -17,12 +17,18 @@
 //! let result: u32 = ctx.decrypt(&c, &sk);
 //! ```
 
+use std::io::{self, Cursor};
+
 use poulpy_core::layouts::{
     Base2K, Degree, Dnum, Dsize, GGLWEToGGSWKeyLayout, GGSWLayout, GLWEAutomorphismKeyLayout,
     GLWELayout, GLWESecret, GLWESecretPrepared, GLWESwitchingKeyLayout, GLWEToLWEKeyLayout,
     LWESecret, Rank, TorusPrecision,
 };
-use poulpy_hal::{api::ModuleNew, layouts::Module, source::Source};
+use poulpy_hal::{
+    api::ModuleNew,
+    layouts::{Module, ReaderFrom, WriterTo},
+    source::Source,
+};
 use poulpy_schemes::bin_fhe::{
     bdd_arithmetic::{
         Add, And, BDDKey, BDDKeyEncryptSk, BDDKeyLayout, BDDKeyPrepared, BDDKeyPreparedFactory,
@@ -46,6 +52,9 @@ use crate::{
 /// Defaults to `crate::backend::BE`; use `--features backend-avx` for the AVX2/FMA backend.
 /// No generic backend parameter surfaces in squid's public API.
 type Mod = Module<crate::backend::BE>;
+
+/// Binary blob format for [`Context::serialize_secret_key`] / [`Context::serialize_evaluation_key`].
+const KEY_BLOB_VERSION: u8 = 1;
 
 #[inline]
 fn assert_eval_threads(n: usize) {
@@ -345,6 +354,104 @@ impl Context {
             bdd_key_prepared,
         };
         (sk, ek)
+    }
+
+    /// Serializes the **standard-form** GLWE + LWE secrets (little-endian, versioned).
+    ///
+    /// The prepared GLWE secret is not stored; reload with [`Context::deserialize_secret_key`],
+    /// which re-runs DFT preparation for this context's backend.
+    pub fn serialize_secret_key(&self, sk: &SecretKey) -> io::Result<Vec<u8>> {
+        let mut out = Vec::new();
+        out.push(KEY_BLOB_VERSION);
+        sk.sk_glwe.write_to(&mut out)?;
+        sk.sk_lwe.write_to(&mut out)?;
+        Ok(out)
+    }
+
+    /// Restores a [`SecretKey`] from [`Context::serialize_secret_key`] output for the same [`Params`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`std::io::Error`] with kind [`InvalidData`](io::ErrorKind::InvalidData) if the
+    /// blob is truncated, has a wrong version, or does not match this context's [`Params`].
+    pub fn deserialize_secret_key(&mut self, bytes: &[u8]) -> io::Result<SecretKey> {
+        let Some((&ver, rest)) = bytes.split_first() else {
+            return Err(io::Error::new(
+                io::ErrorKind::UnexpectedEof,
+                "empty secret key blob",
+            ));
+        };
+        if ver != KEY_BLOB_VERSION {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("unsupported secret key blob version {ver}"),
+            ));
+        }
+        let mut r = Cursor::new(rest);
+        let mut sk_glwe = GLWESecret::alloc_from_infos(&self.params.glwe_layout);
+        sk_glwe.read_from(&mut r)?;
+        let mut sk_lwe = LWESecret::alloc(self.params.bdd_layout.cbt_layout.brk_layout.n_lwe);
+        sk_lwe.read_from(&mut r)?;
+        if (r.position() as usize) != rest.len() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "trailing bytes in secret key blob",
+            ));
+        }
+        let mut sk_glwe_prepared =
+            GLWESecretPrepared::alloc_from_infos(&self.module, &self.params.glwe_layout);
+        sk_glwe_prepared.prepare(&self.module, &sk_glwe);
+        Ok(SecretKey {
+            sk_glwe,
+            sk_glwe_prepared,
+            sk_lwe,
+        })
+    }
+
+    /// Serializes the standard-form BDD evaluation key (little-endian, versioned).
+    /// The prepared key is not stored; use [`Context::deserialize_evaluation_key`].
+    pub fn serialize_evaluation_key(&self, ek: &EvaluationKey) -> io::Result<Vec<u8>> {
+        let mut out = Vec::new();
+        out.push(KEY_BLOB_VERSION);
+        ek.bdd_key.write_to(&mut out)?;
+        Ok(out)
+    }
+
+    /// Restores an [`EvaluationKey`] from [`Context::serialize_evaluation_key`] for the same [`Params`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`std::io::Error`] with kind [`InvalidData`](io::ErrorKind::InvalidData) if the
+    /// blob does not match this context's [`Params`] layouts.
+    pub fn deserialize_evaluation_key(&mut self, bytes: &[u8]) -> io::Result<EvaluationKey> {
+        let Some((&ver, rest)) = bytes.split_first() else {
+            return Err(io::Error::new(
+                io::ErrorKind::UnexpectedEof,
+                "empty evaluation key blob",
+            ));
+        };
+        if ver != KEY_BLOB_VERSION {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("unsupported evaluation key blob version {ver}"),
+            ));
+        }
+        let mut r = Cursor::new(rest);
+        let mut bdd_key = BDDKey::alloc_from_infos(&self.params.bdd_layout);
+        bdd_key.read_from(&mut r)?;
+        if (r.position() as usize) != rest.len() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "trailing bytes in evaluation key blob",
+            ));
+        }
+        let mut bdd_key_prepared =
+            BDDKeyPrepared::alloc_from_infos(&self.module, &self.params.bdd_layout);
+        bdd_key_prepared.prepare(&self.module, &bdd_key, scratch::borrow(&mut self.arena));
+        Ok(EvaluationKey {
+            bdd_key,
+            bdd_key_prepared,
+        })
     }
 
     // ── Encrypt / Decrypt ────────────────────────────────────────────────────

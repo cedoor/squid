@@ -85,7 +85,7 @@ The public API is identical regardless of which backend is selected.
 - [ ] Sub-word operations: [#10](https://github.com/cedoor/squid/issues/10)
 - [ ] Identity / noise refresh: [#11](https://github.com/cedoor/squid/issues/11)
 - [ ] NTT backend: [#12](https://github.com/cedoor/squid/issues/12)
-- [ ] Key serialization: [#13](https://github.com/cedoor/squid/issues/13)
+- [x] Key serialization: [#13](https://github.com/cedoor/squid/issues/13)
 
 ### Milestone 3 — Developer Experience & Optimization: [#3](https://github.com/cedoor/squid/milestone/3)
 
