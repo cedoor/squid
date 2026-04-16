@@ -4,16 +4,16 @@
 //! `params_test_secret_key.bin` and `params_test_evaluation_key.bin`.
 //!
 //! ```sh
-//! cargo run --example serialize_keys -- --output-dir tests/fixtures
+//! cargo run --example serialize_keys -- --output-dir ./out
 //! ```
 //!
-//! The output directory is created if missing.
+//! The output directory is created if missing. Useful for inspecting blob sizes or feeding
+//! keys to out-of-tree tooling — integration tests keygen in-process instead.
 
 use std::path::PathBuf;
 
 use squid::{Context, Params};
 
-/// Fixed output names (must stay aligned with `tests/common/mod.rs` `include_bytes!` paths).
 const SECRET_KEY_FILE: &str = "params_test_secret_key.bin";
 const EVALUATION_KEY_FILE: &str = "params_test_evaluation_key.bin";
 
