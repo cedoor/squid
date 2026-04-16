@@ -2,7 +2,7 @@ use squid::{Context, Params};
 
 #[test]
 fn eval_threads_two_matches_one() {
-    let params = Params::unsecure();
+    let params = Params::test();
 
     let mut ctx1 = Context::new(params.clone());
     let mut ctx2 = Context::new(params).with_eval_threads(2);

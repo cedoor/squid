@@ -91,7 +91,9 @@ impl Default for ContextOptions {
 ///
 /// Wraps all layout descriptors needed for key generation, encryption, and
 /// evaluation.  [`Params::unsecure`] matches Poulpy's `bdd_arithmetic` example
-/// (n = 1024) and is **not** presented as a vetted security level.
+/// (n = 1024); [`Params::test`] matches Poulpy's `bdd_arithmetic`
+/// `test_suite` layouts (smaller ring, faster tests).  Neither is a vetted
+/// security level.
 ///
 /// Advanced users may construct custom `Params` directly (often with struct
 /// update syntax, e.g. `Params { n_glwe: 2048, ..Params::unsecure() }`), but
@@ -185,6 +187,98 @@ impl Params {
                 k: TorusPrecision(4 * BASE2K),
                 rank_in: Rank(1),
                 dnum: Dnum(4),
+            },
+        };
+
+        Params {
+            n_glwe: N_GLWE,
+            binary_block_size: BINARY_BLOCK_SIZE,
+            glwe_layout,
+            ggsw_layout,
+            bdd_layout,
+        }
+    }
+
+    /// Same layout bundle as Poulpy's `bdd_arithmetic` **`test_suite`** module
+    /// (`poulpy-schemes/src/bin_fhe/bdd_arithmetic/tests/test_suite/mod.rs`):
+    /// ring degree 256, rank 2, smaller keys than [`Params::unsecure`].
+    ///
+    /// Use in tests or local dev when you want parity with Poulpy's BDD tests and
+    /// faster runs than the `bdd_arithmetic` example parameters.  **Not** a
+    /// production security target.  If Poulpy changes its test layouts, update
+    /// this constructor to match.
+    pub fn test() -> Self {
+        // Keep in sync with poulpy-schemes `bdd_arithmetic::tests::test_suite` constants.
+        const N_GLWE: u32 = 256;
+        const N_LWE: u32 = 77;
+        const FHEUINT_BASE2K: u32 = 13;
+        const BRK_BASE2K: u32 = 12;
+        const ATK_BASE2K: u32 = 11;
+        const TSK_BASE2K: u32 = 10;
+        const LWE_KS_BASE2K: u32 = 4;
+        const K_GLWE: u32 = 26;
+        const K_GGSW: u32 = 39;
+        const BINARY_BLOCK_SIZE: u32 = 7;
+        const RANK: u32 = 2;
+
+        let glwe_layout = GLWELayout {
+            n: Degree(N_GLWE),
+            base2k: Base2K(FHEUINT_BASE2K),
+            k: TorusPrecision(K_GLWE),
+            rank: Rank(RANK),
+        };
+
+        let ggsw_layout = GGSWLayout {
+            n: Degree(N_GLWE),
+            base2k: Base2K(FHEUINT_BASE2K),
+            k: TorusPrecision(K_GGSW),
+            rank: Rank(RANK),
+            dnum: Dnum(2),
+            dsize: Dsize(1),
+        };
+
+        let bdd_layout = BDDKeyLayout {
+            cbt_layout: CircuitBootstrappingKeyLayout {
+                brk_layout: BlindRotationKeyLayout {
+                    n_glwe: Degree(N_GLWE),
+                    n_lwe: Degree(N_LWE),
+                    base2k: Base2K(BRK_BASE2K),
+                    k: TorusPrecision(52),
+                    dnum: Dnum(4),
+                    rank: Rank(RANK),
+                },
+                atk_layout: GLWEAutomorphismKeyLayout {
+                    n: Degree(N_GLWE),
+                    base2k: Base2K(ATK_BASE2K),
+                    k: TorusPrecision(52),
+                    rank: Rank(RANK),
+                    dnum: Dnum(4),
+                    dsize: Dsize(1),
+                },
+                tsk_layout: GGLWEToGGSWKeyLayout {
+                    n: Degree(N_GLWE),
+                    base2k: Base2K(TSK_BASE2K),
+                    k: TorusPrecision(52),
+                    rank: Rank(RANK),
+                    dnum: Dnum(4),
+                    dsize: Dsize(1),
+                },
+            },
+            ks_glwe_layout: Some(GLWESwitchingKeyLayout {
+                n: Degree(N_GLWE),
+                base2k: Base2K(LWE_KS_BASE2K),
+                k: TorusPrecision(20),
+                rank_in: Rank(RANK),
+                rank_out: Rank(1),
+                dnum: Dnum(3),
+                dsize: Dsize(1),
+            }),
+            ks_lwe_layout: GLWEToLWEKeyLayout {
+                n: Degree(N_GLWE),
+                base2k: Base2K(LWE_KS_BASE2K),
+                k: TorusPrecision(16),
+                rank_in: Rank(1),
+                dnum: Dnum(3),
             },
         };
 

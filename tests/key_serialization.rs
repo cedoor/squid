@@ -2,7 +2,7 @@ use squid::{Context, Params};
 
 #[test]
 fn secret_and_evaluation_keys_roundtrip_through_blob_format() {
-    let params = Params::unsecure();
+    let params = Params::test();
     let mut ctx = Context::new(params);
     let (sk, ek) = ctx.keygen();
 
