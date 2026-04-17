@@ -21,8 +21,8 @@ use std::io::{self, Cursor};
 
 use poulpy_core::layouts::{
     Base2K, Degree, Dnum, Dsize, GGLWEToGGSWKeyLayout, GGSWLayout, GLWEAutomorphismKeyLayout,
-    GLWELayout, GLWESecret, GLWESecretPrepared, GLWESwitchingKeyLayout, GLWEToLWEKeyLayout,
-    LWESecret, Rank, TorusPrecision,
+    GLWEInfos, GLWELayout, GLWESecret, GLWESecretPrepared, GLWESwitchingKeyLayout, GLWEToLWEKeyLayout,
+    GLWEToMut, LWESecret, LWEInfos, Rank, TorusPrecision,
 };
 use poulpy_hal::{
     api::ModuleNew,
@@ -40,6 +40,7 @@ use poulpy_schemes::bin_fhe::{
 };
 
 use crate::{
+    ciphertext::CIPHERTEXT_BLOB_VERSION,
     keys::{EvaluationKey, KeygenSeeds, SecretKey, EVALUATION_KEY_BLOB_VERSION},
     scratch, Ciphertext,
 };
@@ -534,6 +535,76 @@ impl Context {
             bdd_key,
             bdd_key_prepared,
         })
+    }
+
+    /// Serializes a [`Ciphertext<T>`] (little-endian, versioned).
+    ///
+    /// Same as [`Ciphertext::serialize`].
+    pub fn serialize_ciphertext<T: UnsignedInteger>(&self, ct: &Ciphertext<T>) -> io::Result<Vec<u8>> {
+        ct.serialize()
+    }
+
+    /// Restores a [`Ciphertext<T>`] from [`Ciphertext::serialize`] / [`Context::serialize_ciphertext`]
+    /// for the same [`Params`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`std::io::Error`] with kind [`InvalidData`](io::ErrorKind::InvalidData) if the
+    /// blob does not match `T` or this context's [`GLWELayout`].
+    pub fn deserialize_ciphertext<T>(&mut self, bytes: &[u8]) -> io::Result<Ciphertext<T>>
+    where
+        T: UnsignedInteger,
+    {
+        let Some((&ver, rest)) = bytes.split_first() else {
+            return Err(io::Error::new(
+                io::ErrorKind::UnexpectedEof,
+                "empty ciphertext blob",
+            ));
+        };
+        if ver != CIPHERTEXT_BLOB_VERSION {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("unsupported ciphertext blob version {ver}"),
+            ));
+        }
+        if rest.len() < 4 {
+            return Err(io::Error::new(
+                io::ErrorKind::UnexpectedEof,
+                "ciphertext blob truncated (bit width)",
+            ));
+        }
+        let bits = u32::from_le_bytes(rest[..4].try_into().unwrap());
+        if bits != T::BITS {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!(
+                    "ciphertext blob declares {bits} bit plaintext width but {} was requested",
+                    T::BITS
+                ),
+            ));
+        }
+        let payload = &rest[4..];
+        let mut r = Cursor::new(payload);
+        let mut fhe_uint = FheUint::alloc_from_infos(&self.params.glwe_layout);
+        fhe_uint.to_mut().read_from(&mut r)?;
+        let gl = &self.params.glwe_layout;
+        if fhe_uint.n() != gl.n
+            || fhe_uint.base2k() != gl.base2k
+            || fhe_uint.k() != gl.k
+            || fhe_uint.rank() != gl.rank
+        {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "ciphertext GLWE parameters do not match context Params",
+            ));
+        }
+        if (r.position() as usize) != payload.len() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "trailing bytes in ciphertext blob",
+            ));
+        }
+        Ok(Ciphertext { inner: fhe_uint })
     }
 
     // ── Encrypt / Decrypt ────────────────────────────────────────────────────
