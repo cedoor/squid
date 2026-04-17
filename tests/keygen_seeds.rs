@@ -35,7 +35,10 @@ fn secret_key_from_lattice_seed_matches_full_keygen_lattice_part() {
     let (sk_full, _, seeds) = ctx.keygen_with_seeds();
     let sk_lattice = SecretKey::from_lattice_seed(&mut ctx, seeds.lattice);
     assert!(sk_full.glwe_standard() == sk_lattice.glwe_standard());
-    assert_eq!(sk_full.lwe_standard().raw(), sk_lattice.lwe_standard().raw());
+    assert_eq!(
+        sk_full.lwe_standard().raw(),
+        sk_lattice.lwe_standard().raw()
+    );
 }
 
 #[test]

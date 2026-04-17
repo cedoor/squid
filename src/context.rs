@@ -21,8 +21,8 @@ use std::io::{self, Cursor};
 
 use poulpy_core::layouts::{
     Base2K, Degree, Dnum, Dsize, GGLWEToGGSWKeyLayout, GGSWLayout, GLWEAutomorphismKeyLayout,
-    GLWEInfos, GLWELayout, GLWESecret, GLWESecretPrepared, GLWESwitchingKeyLayout, GLWEToLWEKeyLayout,
-    GLWEToMut, LWESecret, LWEInfos, Rank, TorusPrecision,
+    GLWEInfos, GLWELayout, GLWESecret, GLWESecretPrepared, GLWESwitchingKeyLayout,
+    GLWEToLWEKeyLayout, GLWEToMut, LWEInfos, LWESecret, Rank, TorusPrecision,
 };
 use poulpy_hal::{
     api::ModuleNew,
@@ -540,7 +540,10 @@ impl Context {
     /// Serializes a [`Ciphertext<T>`] (little-endian, versioned).
     ///
     /// Same as [`Ciphertext::serialize`].
-    pub fn serialize_ciphertext<T: UnsignedInteger>(&self, ct: &Ciphertext<T>) -> io::Result<Vec<u8>> {
+    pub fn serialize_ciphertext<T: UnsignedInteger>(
+        &self,
+        ct: &Ciphertext<T>,
+    ) -> io::Result<Vec<u8>> {
         ct.serialize()
     }
 
