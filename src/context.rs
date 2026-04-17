@@ -26,7 +26,7 @@ use poulpy_core::layouts::{
 };
 use poulpy_hal::{
     api::ModuleNew,
-    layouts::{Module, ReaderFrom, WriterTo},
+    layouts::{Module, ReaderFrom},
     source::Source,
 };
 use poulpy_schemes::bin_fhe::{
@@ -40,7 +40,7 @@ use poulpy_schemes::bin_fhe::{
 };
 
 use crate::{
-    keys::{EvaluationKey, SecretKey},
+    keys::{EvaluationKey, KeygenSeeds, SecretKey, EVALUATION_KEY_BLOB_VERSION},
     scratch, Ciphertext,
 };
 
@@ -52,9 +52,6 @@ use crate::{
 /// Defaults to `crate::backend::BE`; use `--features backend-avx` for the AVX2/FMA backend.
 /// No generic backend parameter surfaces in squid's public API.
 type Mod = Module<crate::backend::BE>;
-
-/// Binary blob format for [`Context::serialize_secret_key`] / [`Context::serialize_evaluation_key`].
-const KEY_BLOB_VERSION: u8 = 1;
 
 #[inline]
 fn assert_eval_threads(n: usize) {
@@ -398,36 +395,56 @@ impl Context {
 
     /// Generate a fresh secret key and the corresponding evaluation key.
     ///
-    /// Uses OS randomness to seed the three CSPRNG streams required by Poulpy
-    /// (secret key, public mask, and error noise).
+    /// Uses OS randomness to seed the three ChaCha8 streams required by Poulpy
+    /// (lattice secrets, BDD public masks, BDD noise). Does not return the seeds;
+    /// use [`Context::keygen_with_seeds`] if you need [`KeygenSeeds`] for persistence.
     ///
     /// # Panics
     ///
     /// Panics if the OS cannot supply enough random bytes (extremely unlikely).
     pub fn keygen(&mut self) -> (SecretKey, EvaluationKey) {
-        let mut source_xs = random_source();
-        let mut source_xa = random_source();
-        let mut source_xe = random_source();
+        let (sk, ek, _) = self.keygen_with_seeds();
+        (sk, ek)
+    }
 
-        // GLWE secret key
-        let mut sk_glwe = GLWESecret::alloc_from_infos(&self.params.glwe_layout);
-        sk_glwe.fill_ternary_prob(0.5, &mut source_xs);
+    /// Like [`Context::keygen`], but also returns the [`KeygenSeeds`] for replay via
+    /// [`Context::keygen_from_seeds`].
+    ///
+    /// # Panics
+    ///
+    /// Panics if the OS cannot supply enough random bytes (extremely unlikely).
+    pub fn keygen_with_seeds(&mut self) -> (SecretKey, EvaluationKey, KeygenSeeds) {
+        let mut lattice = [0u8; 32];
+        let mut bdd_mask = [0u8; 32];
+        let mut bdd_noise = [0u8; 32];
 
-        // LWE secret key (block-binary)
-        let mut sk_lwe = LWESecret::alloc(self.params.bdd_layout.cbt_layout.brk_layout.n_lwe);
-        sk_lwe.fill_binary_block(self.params.binary_block_size as usize, &mut source_xs);
+        getrandom::fill(&mut lattice).expect("OS random number generator unavailable");
+        getrandom::fill(&mut bdd_mask).expect("OS random number generator unavailable");
+        getrandom::fill(&mut bdd_noise).expect("OS random number generator unavailable");
 
-        // Prepared GLWE secret (DFT domain) — needed for encryption/decryption
-        let mut sk_glwe_prepared =
-            GLWESecretPrepared::alloc_from_infos(&self.module, &self.params.glwe_layout);
-        sk_glwe_prepared.prepare(&self.module, &sk_glwe);
+        let seeds = KeygenSeeds {
+            lattice,
+            bdd_mask,
+            bdd_noise,
+        };
+        let (sk, ek) = self.keygen_from_seeds(seeds);
+
+        (sk, ek, seeds)
+    }
+
+    /// Deterministic key generation from stored [`KeygenSeeds`] for the same [`Params`] and backend.
+    pub fn keygen_from_seeds(&mut self, seeds: KeygenSeeds) -> (SecretKey, EvaluationKey) {
+        let mut source_xs = Source::new(seeds.lattice);
+        let sk = self.secret_key_material_from_lattice_source(&mut source_xs);
+        let mut source_xa = Source::new(seeds.bdd_mask);
+        let mut source_xe = Source::new(seeds.bdd_noise);
 
         // BDD evaluation key (standard form)
         let mut bdd_key: BDDKey<Vec<u8>, CGGI> = BDDKey::alloc_from_infos(&self.params.bdd_layout);
         bdd_key.encrypt_sk(
             &self.module,
-            &sk_lwe,
-            &sk_glwe,
+            &sk.sk_lwe,
+            &sk.sk_glwe,
             &mut source_xa,
             &mut source_xe,
             scratch::borrow(&mut self.arena),
@@ -438,11 +455,6 @@ impl Context {
             BDDKeyPrepared::alloc_from_infos(&self.module, &self.params.bdd_layout);
         bdd_key_prepared.prepare(&self.module, &bdd_key, scratch::borrow(&mut self.arena));
 
-        let sk = SecretKey {
-            sk_glwe,
-            sk_glwe_prepared,
-            sk_lwe,
-        };
         let ek = EvaluationKey {
             bdd_key,
             bdd_key_prepared,
@@ -450,68 +462,44 @@ impl Context {
         (sk, ek)
     }
 
-    /// Serializes the **standard-form** GLWE + LWE secrets (little-endian, versioned).
+    /// Secret key material (encrypt/decrypt) from the **lattice** ChaCha seed only — the same
+    /// [`KeygenSeeds::lattice`] field used in [`Context::keygen_from_seeds`].
     ///
-    /// The prepared GLWE secret is not stored; reload with [`Context::deserialize_secret_key`],
-    /// which re-runs DFT preparation for this context's backend.
-    pub fn serialize_secret_key(&self, sk: &SecretKey) -> io::Result<Vec<u8>> {
-        let mut out = Vec::new();
-        out.push(KEY_BLOB_VERSION);
-        sk.sk_glwe.write_to(&mut out)?;
-        sk.sk_lwe.write_to(&mut out)?;
-        Ok(out)
+    /// Does not use [`KeygenSeeds::bdd_mask`] or [`KeygenSeeds::bdd_noise`]; you must obtain an
+    /// [`EvaluationKey`] separately (e.g. full [`Context::keygen_from_seeds`] or
+    /// [`Context::deserialize_evaluation_key`]).
+    pub fn secret_key_from_lattice_seed(&mut self, lattice_seed: [u8; 32]) -> SecretKey {
+        let mut source_xs = Source::new(lattice_seed);
+        self.secret_key_material_from_lattice_source(&mut source_xs)
     }
 
-    /// Restores a [`SecretKey`] from [`Context::serialize_secret_key`] output for the same [`Params`].
-    ///
-    /// # Errors
-    ///
-    /// Returns [`std::io::Error`] with kind [`InvalidData`](io::ErrorKind::InvalidData) if the
-    /// blob is truncated, has a wrong version, or does not match this context's [`Params`].
-    pub fn deserialize_secret_key(&mut self, bytes: &[u8]) -> io::Result<SecretKey> {
-        let Some((&ver, rest)) = bytes.split_first() else {
-            return Err(io::Error::new(
-                io::ErrorKind::UnexpectedEof,
-                "empty secret key blob",
-            ));
-        };
-        if ver != KEY_BLOB_VERSION {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("unsupported secret key blob version {ver}"),
-            ));
-        }
-        let mut r = Cursor::new(rest);
+    fn secret_key_material_from_lattice_source(&mut self, source_xs: &mut Source) -> SecretKey {
         let mut sk_glwe = GLWESecret::alloc_from_infos(&self.params.glwe_layout);
-        sk_glwe.read_from(&mut r)?;
+        sk_glwe.fill_ternary_prob(0.5, source_xs);
+
         let mut sk_lwe = LWESecret::alloc(self.params.bdd_layout.cbt_layout.brk_layout.n_lwe);
-        sk_lwe.read_from(&mut r)?;
-        if (r.position() as usize) != rest.len() {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "trailing bytes in secret key blob",
-            ));
-        }
+        sk_lwe.fill_binary_block(self.params.binary_block_size as usize, source_xs);
+
         let mut sk_glwe_prepared =
             GLWESecretPrepared::alloc_from_infos(&self.module, &self.params.glwe_layout);
         sk_glwe_prepared.prepare(&self.module, &sk_glwe);
-        Ok(SecretKey {
+
+        SecretKey {
             sk_glwe,
             sk_glwe_prepared,
             sk_lwe,
-        })
+        }
     }
 
     /// Serializes the standard-form BDD evaluation key (little-endian, versioned).
     /// The prepared key is not stored; use [`Context::deserialize_evaluation_key`].
+    ///
+    /// Same as [`EvaluationKey::serialize`].
     pub fn serialize_evaluation_key(&self, ek: &EvaluationKey) -> io::Result<Vec<u8>> {
-        let mut out = Vec::new();
-        out.push(KEY_BLOB_VERSION);
-        ek.bdd_key.write_to(&mut out)?;
-        Ok(out)
+        ek.serialize()
     }
 
-    /// Restores an [`EvaluationKey`] from [`Context::serialize_evaluation_key`] for the same [`Params`].
+    /// Restores an [`EvaluationKey`] from [`EvaluationKey::serialize`] / [`Context::serialize_evaluation_key`] for the same [`Params`].
     ///
     /// # Errors
     ///
@@ -524,7 +512,7 @@ impl Context {
                 "empty evaluation key blob",
             ));
         };
-        if ver != KEY_BLOB_VERSION {
+        if ver != EVALUATION_KEY_BLOB_VERSION {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 format!("unsupported evaluation key blob version {ver}"),

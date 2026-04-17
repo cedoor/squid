@@ -1,20 +1,19 @@
-//! Serialize [`squid::SecretKey`] and [`squid::EvaluationKey`] to files (standard form).
+//! Write the standard-form [`squid::EvaluationKey`] blob from one OS-random keygen.
 //!
-//! Uses [`Params::test`] and a single [`Context::keygen`] run. Output file names are fixed:
-//! `params_test_secret_key.bin` and `params_test_evaluation_key.bin`.
+//! Secret key material is not written: Poulpy no longer exposes binary I/O for
+//! LWE/GLWE secrets ([poulpy#147](https://github.com/poulpy-fhe/poulpy/pull/147));
+//! persist seeds or handle secrets at the app level if you need portability.
+//!
+//! Output: `params_test_evaluation_key.bin` under `--output-dir`.
 //!
 //! ```sh
 //! cargo run --example serialize_keys -- --output-dir ./out
 //! ```
-//!
-//! The output directory is created if missing. Useful for inspecting blob sizes or feeding
-//! keys to out-of-tree tooling — integration tests keygen in-process instead.
 
 use std::path::PathBuf;
 
 use squid::{Context, Params};
 
-const SECRET_KEY_FILE: &str = "params_test_secret_key.bin";
 const EVALUATION_KEY_FILE: &str = "params_test_evaluation_key.bin";
 
 struct Args {
@@ -26,14 +25,13 @@ fn print_usage() {
         "\
 Usage: serialize_keys --output-dir <DIR>
 
-Write standard-form key blobs from one OS-random keygen using Params::test().
+Write the standard-form evaluation key blob from one OS-random keygen (Params::test()).
 
-Files written (fixed names):
-    {SECRET_KEY_FILE}
+File written (fixed name):
     {EVALUATION_KEY_FILE}
 
 Options:
-    -o, --output-dir <DIR>    Directory to write the two key files into
+    -o, --output-dir <DIR>    Directory to write the file into
     -h, --help                Show this help
 "
     );
@@ -78,25 +76,18 @@ fn main() -> std::io::Result<()> {
 
     std::fs::create_dir_all(&args.output_dir)?;
 
-    let secret_key = args.output_dir.join(SECRET_KEY_FILE);
     let evaluation_key = args.output_dir.join(EVALUATION_KEY_FILE);
 
     let params = Params::test();
     let mut ctx = Context::new(params);
-    let (sk, ek) = ctx.keygen();
+    let (_sk, ek) = ctx.keygen();
 
-    let sk_blob = ctx.serialize_secret_key(&sk).expect("serialize secret key");
     let ek_blob = ctx
         .serialize_evaluation_key(&ek)
         .expect("serialize evaluation key");
 
-    std::fs::write(&secret_key, sk_blob)?;
     std::fs::write(&evaluation_key, ek_blob)?;
 
-    eprintln!(
-        "Wrote {} and {}.",
-        secret_key.display(),
-        evaluation_key.display()
-    );
+    eprintln!("Wrote {}.", evaluation_key.display());
     Ok(())
 }

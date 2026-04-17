@@ -518,7 +518,7 @@ dependencies = [
 [[package]]
 name = "poulpy-core"
 version = "0.5.0"
-source = "git+https://github.com/cedoor/poulpy.git?branch=feat%2Fserialization-key-types#d95a85f88e0444b9f01c1b8822b1f239c222f1da"
+source = "git+https://github.com/cedoor/poulpy.git?branch=feat%2Fserialization-key-types#bfd0be570c72b53c9886d615754d52cd93ad61f9"
 dependencies = [
  "bytemuck",
  "byteorder",
@@ -535,7 +535,7 @@ dependencies = [
 [[package]]
 name = "poulpy-cpu-avx"
 version = "0.5.0"
-source = "git+https://github.com/cedoor/poulpy.git?branch=feat%2Fserialization-key-types#d95a85f88e0444b9f01c1b8822b1f239c222f1da"
+source = "git+https://github.com/cedoor/poulpy.git?branch=feat%2Fserialization-key-types#bfd0be570c72b53c9886d615754d52cd93ad61f9"
 dependencies = [
  "bytemuck",
  "byteorder",
@@ -553,7 +553,7 @@ dependencies = [
 [[package]]
 name = "poulpy-cpu-ref"
 version = "0.5.0"
-source = "git+https://github.com/cedoor/poulpy.git?branch=feat%2Fserialization-key-types#d95a85f88e0444b9f01c1b8822b1f239c222f1da"
+source = "git+https://github.com/cedoor/poulpy.git?branch=feat%2Fserialization-key-types#bfd0be570c72b53c9886d615754d52cd93ad61f9"
 dependencies = [
  "bytemuck",
  "byteorder",
@@ -569,7 +569,7 @@ dependencies = [
 [[package]]
 name = "poulpy-hal"
 version = "0.5.0"
-source = "git+https://github.com/cedoor/poulpy.git?branch=feat%2Fserialization-key-types#d95a85f88e0444b9f01c1b8822b1f239c222f1da"
+source = "git+https://github.com/cedoor/poulpy.git?branch=feat%2Fserialization-key-types#bfd0be570c72b53c9886d615754d52cd93ad61f9"
 dependencies = [
  "bytemuck",
  "byteorder",
@@ -588,7 +588,7 @@ dependencies = [
 [[package]]
 name = "poulpy-schemes"
 version = "0.5.0"
-source = "git+https://github.com/cedoor/poulpy.git?branch=feat%2Fserialization-key-types#d95a85f88e0444b9f01c1b8822b1f239c222f1da"
+source = "git+https://github.com/cedoor/poulpy.git?branch=feat%2Fserialization-key-types#bfd0be570c72b53c9886d615754d52cd93ad61f9"
 dependencies = [
  "byteorder",
  "criterion",
