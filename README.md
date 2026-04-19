@@ -21,8 +21,8 @@ fn main() {
     let (sk, ek) = ctx.keygen();
 
     // Encrypt two 32-bit integers
-    let a = ctx.encrypt::<u32>(255, &sk);
-    let b = ctx.encrypt::<u32>(30, &sk);
+    let a = ctx.encrypt::<u32>(255, &sk, &ek);
+    let b = ctx.encrypt::<u32>(30, &sk, &ek);
 
     // Homomorphic addition: computes (a + b) under encryption
     let c = ctx.add(&a, &b, &ek);
@@ -53,12 +53,10 @@ All operations currently require `T = u32` (the only width with compiled BDD cir
 
 ## Backends
 
-Squid defaults to a portable scalar CPU backend. On x86-64 machines with AVX2 and FMA, you can opt into a faster backend:
-
-| Feature flag  | Backend    | Requirements              | Typical speedup |
-|---------------|------------|---------------------------|-----------------|
-| *(default)*   | `FFT64Ref` | Any CPU                   | baseline        |
-| `backend-avx` | `FFT64Avx` | x86-64 with AVX2 + FMA    | ~3–5×           |
+| Feature       | Backend    | Notes                          |
+|---------------|------------|--------------------------------|
+| *(default)*   | `FFT64Ref` | Portable                       |
+| `backend-avx` | `FFT64Avx` | x86-64, AVX2+FMA (~3–5× vs ref) |
 
 ```sh
 RUSTFLAGS="-C target-cpu=native" cargo build --release --features backend-avx
@@ -76,7 +74,7 @@ The public API is identical regardless of which backend is selected.
 - [x] Add at least one runnable example in examples/: [#7](https://github.com/cedoor/squid/issues/7)
 - [ ] Add tests for all existing ops: [#4](https://github.com/cedoor/squid/issues/4)
 - [ ] Add rustdoc comments to all public items: [#6](https://github.com/cedoor/squid/issues/6)
-- [ ] Faster tests via fixtures or deterministic keygen: [#19](https://github.com/cedoor/squid/issues/19)
+- [x] Faster tests via fixtures or deterministic keygen: [#19](https://github.com/cedoor/squid/issues/19)
 
 ### Milestone 2 — Full bin_fhe Coverage: [#2](https://github.com/cedoor/squid/milestone/2)
 
@@ -85,7 +83,8 @@ The public API is identical regardless of which backend is selected.
 - [ ] Sub-word operations: [#10](https://github.com/cedoor/squid/issues/10)
 - [ ] Identity / noise refresh: [#11](https://github.com/cedoor/squid/issues/11)
 - [ ] NTT backend: [#12](https://github.com/cedoor/squid/issues/12)
-- [ ] Key serialization: [#13](https://github.com/cedoor/squid/issues/13)
+- [x] Key serialization: [#13](https://github.com/cedoor/squid/issues/13)
+- [ ] Revert `encrypt` workaround once upstream poulpy bug is fixed: [#24](https://github.com/cedoor/squid/issues/24)
 
 ### Milestone 3 — Developer Experience & Optimization: [#3](https://github.com/cedoor/squid/milestone/3)
 
@@ -95,12 +94,12 @@ The public API is identical regardless of which backend is selected.
 - [ ] Benchmarks: [#17](https://github.com/cedoor/squid/issues/17)
 - [ ] Vetted Params presets: [#18](https://github.com/cedoor/squid/issues/18)
 - [ ] Refactor `context.rs`: [#20](https://github.com/cedoor/squid/issues/20)
-- [ ] Split keygen scratch from runtime arena to reduce persistent memory: [#22](https://github.com/cedoor/squid/issues/22)
+- [x] [#22](https://github.com/cedoor/squid/issues/22) — closed: `Context` no longer keeps a persistent max-sized arena; scratch is allocated per operation from Poulpy’s `*_tmp_bytes` (supersedes the issue’s “split keygen vs runtime” split).
 
 ## Design goals
 
 - **Hide scratch management.** Callers never allocate or thread scratch buffers.
 - **Hide lifecycle transitions.** The Standard → Prepared → BDD-eval pipeline is handled internally; users see one coherent `Ciphertext<T>` type.
 - **Explicitly non-production defaults.** `Params::unsecure()` matches Poulpy's `bdd_arithmetic` example for demos; treat it as unaudited unless you analyse parameters yourself.
-- **No magic.** Every abstraction is traceable to the underlying Poulpy call. No hidden global state, no surprising allocations beyond the initial `Context::new`.
+- **No magic.** Every abstraction is traceable to the underlying Poulpy call. No hidden global state; scratch is sized with Poulpy’s `*_tmp_bytes` at each operation.
 - **Safe defaults.** Every user-facing choice has a default that works without configuration. Alternatives are documented with their trade-offs and the conditions under which they should be preferred.

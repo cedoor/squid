@@ -10,7 +10,7 @@ Read this before touching any non-trivial code.
 
 ## 1. Scratch arenas
 
-Poulpy operations never heap-allocate on the hot path. Every operation accepts `&mut Scratch<BE>` and a companion `*_tmp_bytes` method tells the caller how many bytes are needed. `ScratchOwned<BE>` is the owned allocation; `.borrow()` yields `&mut Scratch<BE>`. squid sizes and owns the arena inside `Context`.
+Poulpy operations never heap-allocate on the hot path. Every operation accepts `&mut Scratch<BE>` and a companion `*_tmp_bytes` method tells the caller how many bytes are needed. `ScratchOwned<BE>` is the owned allocation; `.borrow()` yields `&mut Scratch<BE>`. squid allocates a `ScratchOwned` per call site from the matching `*_tmp_bytes` (same idea as Poulpy’s examples/tests), without exposing scratch in the public API.
 
 ## 2. Three-layer lifecycle
 

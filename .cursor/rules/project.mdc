@@ -25,7 +25,7 @@ Everything flows through `Context`. The user-facing types are:
 
 | Type | Role |
 |---|---|
-| `Context` | Owns `Module<BE>`, scratch arena, and `Params`. Entry point for all operations. |
+| `Context` | Owns `Module<BE>` and `Params`. Allocates Poulpy scratch per operation from `*_tmp_bytes` (not exposed). Entry point for all operations. |
 | `Params` | Layout parameter bundle. Use `Params::unsecure()` (demo / non-production) or construct custom. |
 | `SecretKey` | Private key material: standard GLWE + LWE secrets and prepared GLWE for encrypt/decrypt. Returned by `Context::keygen`. |
 | `EvaluationKey` | Public evaluation key bundle (`BDDKey` standard + prepared). Returned by `Context::keygen`. |
