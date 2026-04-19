@@ -18,17 +18,20 @@
 //! Standard-form wire encoding is [`Ciphertext::serialize`] /
 //! [`Ciphertext::deserialize`] / [`crate::context::Context::serialize_ciphertext`] /
 //! [`crate::context::Context::deserialize_ciphertext`] (versioned little-endian blob;
-//! must be loaded with the same [`crate::context::Params`] as encryption).
+//! must be loaded with the same [`crate::context::Params`] as encryption). The blob embeds the
+//! GLWE layout so mismatched parameters are rejected before ciphertext bytes are read.
 
 use std::io;
 
-use poulpy_core::layouts::GLWEToRef;
+use poulpy_core::layouts::{GLWEInfos, GLWEToRef};
 use poulpy_hal::layouts::{DeviceBuf, WriterTo};
 use poulpy_schemes::bin_fhe::bdd_arithmetic::{FheUint, FheUintPrepared, UnsignedInteger};
 
 use crate::context::Context;
 
 /// Leading byte of [`Ciphertext::serialize`] / [`crate::context::Context::serialize_ciphertext`] blobs.
+/// After the plaintext bit width, the blob includes `n`, `base2k`, `k`, and `rank` (each `u32`
+/// little-endian), then the packed GLWE payload.
 pub(crate) const CIPHERTEXT_BLOB_VERSION: u8 = 1;
 
 /// An encrypted unsigned integer of type `T`.
@@ -60,6 +63,11 @@ impl<T: UnsignedInteger> Ciphertext<T> {
         let mut out = Vec::new();
         out.push(CIPHERTEXT_BLOB_VERSION);
         out.extend_from_slice(&T::BITS.to_le_bytes());
+        let gl = self.inner.glwe_layout();
+        out.extend_from_slice(&gl.n.as_u32().to_le_bytes());
+        out.extend_from_slice(&gl.base2k.as_u32().to_le_bytes());
+        out.extend_from_slice(&gl.k.as_u32().to_le_bytes());
+        out.extend_from_slice(&gl.rank.as_u32().to_le_bytes());
         self.inner.to_ref().write_to(&mut out)?;
         Ok(out)
     }

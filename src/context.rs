@@ -22,8 +22,8 @@ use std::io::{self, Cursor};
 use poulpy_core::{
     layouts::{
         prepared::GLWESecretPreparedFactory, Base2K, Degree, Dnum, Dsize, GGLWEToGGSWKeyLayout,
-        GGSWLayout, GLWEAutomorphismKeyLayout, GLWEInfos, GLWELayout, GLWESecret,
-        GLWESwitchingKeyLayout, GLWEToLWEKeyLayout, GLWEToMut, LWEInfos, LWESecret, Rank,
+        GGSWLayout, GLWEAutomorphismKeyLayout, GLWELayout, GLWESecret,
+        GLWESwitchingKeyLayout, GLWEToLWEKeyLayout, GLWEToMut, LWESecret, Rank,
         TorusPrecision,
     },
     EncryptionLayout,
@@ -588,10 +588,11 @@ impl Context {
                 format!("unsupported ciphertext blob version {ver}"),
             ));
         }
-        if rest.len() < 4 {
+        const GLWE_LAYOUT_HEAD: usize = 4 * 4;
+        if rest.len() < 4 + GLWE_LAYOUT_HEAD {
             return Err(io::Error::new(
                 io::ErrorKind::UnexpectedEof,
-                "ciphertext blob truncated (bit width)",
+                "ciphertext blob truncated (header)",
             ));
         }
         let bits = u32::from_le_bytes(rest[..4].try_into().unwrap());
@@ -604,21 +605,22 @@ impl Context {
                 ),
             ));
         }
-        let payload = &rest[4..];
+        let blob_glwe = GLWELayout {
+            n: Degree(u32::from_le_bytes(rest[4..8].try_into().unwrap())),
+            base2k: Base2K(u32::from_le_bytes(rest[8..12].try_into().unwrap())),
+            k: TorusPrecision(u32::from_le_bytes(rest[12..16].try_into().unwrap())),
+            rank: Rank(u32::from_le_bytes(rest[16..20].try_into().unwrap())),
+        };
+        if blob_glwe != self.params.glwe_layout {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "ciphertext GLWE parameters in blob do not match context Params",
+            ));
+        }
+        let payload = &rest[4 + GLWE_LAYOUT_HEAD..];
         let mut r = Cursor::new(payload);
         let mut fhe_uint = FheUint::alloc_from_infos(&self.params.glwe_layout);
         fhe_uint.to_mut().read_from(&mut r)?;
-        let gl = &self.params.glwe_layout;
-        if fhe_uint.n() != gl.n
-            || fhe_uint.base2k() != gl.base2k
-            || fhe_uint.max_k() != gl.k
-            || fhe_uint.rank() != gl.rank
-        {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "ciphertext GLWE parameters do not match context Params",
-            ));
-        }
         if (r.position() as usize) != payload.len() {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
