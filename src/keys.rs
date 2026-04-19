@@ -24,6 +24,7 @@
 //! blob as [`EvaluationKey::serialize`]), see [`EvaluationKey::bdd_standard`],
 //! [`EvaluationKey::serialize`], and [`EvaluationKey::deserialize`].
 
+use std::fmt;
 use std::io;
 
 use poulpy_core::layouts::{prepared::GLWESecretPrepared, GLWESecret, LWESecret};
@@ -43,11 +44,21 @@ pub(crate) const EVALUATION_KEY_BLOB_VERSION: u8 = 1;
 /// These match the three independent [`poulpy_hal::source::Source`] streams in
 /// Poulpy key generation: lattice secrets (GLWE + LWE), BDD public-mask
 /// randomness, and BDD error randomness.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct KeygenSeeds {
     pub lattice: [u8; 32],
     pub bdd_mask: [u8; 32],
     pub bdd_noise: [u8; 32],
+}
+
+impl fmt::Debug for KeygenSeeds {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("KeygenSeeds")
+            .field("lattice", &"<redacted>")
+            .field("bdd_mask", &"<redacted>")
+            .field("bdd_noise", &"<redacted>")
+            .finish()
+    }
 }
 
 /// The private key material.
