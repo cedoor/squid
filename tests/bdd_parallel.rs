@@ -20,7 +20,7 @@ fn eval_threads_two_matches_one() {
 
     let r1 = ctx1.decrypt(&c1, &sk1);
     let r2 = ctx2.decrypt(&c2, &sk2);
-    
+
     assert_eq!(r1, 12u32);
     assert_eq!(r2, 12u32);
 }

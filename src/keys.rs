@@ -61,7 +61,8 @@ pub struct KeygenSeeds {
 /// [`crate::context::Context::secret_key_from_lattice_seed`] (lattice seed only).
 pub struct SecretKey {
     pub(crate) sk_glwe: GLWESecret<Vec<u8>>,
-    pub(crate) sk_glwe_prepared: GLWESecretPrepared<DeviceBuf<crate::backend::BE>, crate::backend::BE>,
+    pub(crate) sk_glwe_prepared:
+        GLWESecretPrepared<DeviceBuf<crate::backend::BE>, crate::backend::BE>,
     pub(crate) sk_lwe: LWESecret<Vec<u8>>,
 }
 
@@ -97,7 +98,8 @@ pub struct EvaluationKey {
     /// Standard-form BDD key (circuit bootstrapping + switching keys).
     pub(crate) bdd_key: BDDKey<Vec<u8>, CGGI>,
     /// Prepared (DFT-domain) copy used on the hot path.
-    pub(crate) bdd_key_prepared: BDDKeyPrepared<DeviceBuf<crate::backend::BE>, CGGI, crate::backend::BE>,
+    pub(crate) bdd_key_prepared:
+        BDDKeyPrepared<DeviceBuf<crate::backend::BE>, CGGI, crate::backend::BE>,
 }
 
 impl EvaluationKey {

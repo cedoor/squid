@@ -493,7 +493,8 @@ impl Context {
         let mut sk_glwe_prepared = self
             .module
             .glwe_secret_prepared_alloc_from_infos(&self.params.glwe_layout);
-        self.module.glwe_secret_prepare(&mut sk_glwe_prepared, &sk_glwe);
+        self.module
+            .glwe_secret_prepare(&mut sk_glwe_prepared, &sk_glwe);
 
         SecretKey {
             sk_glwe,
@@ -543,8 +544,10 @@ impl Context {
             CGGI,
             crate::backend::BE,
         > = BDDKeyPrepared::alloc_from_infos(&self.module, &self.params.bdd_layout);
-        let mut scratch_p =
-            scratch::new_arena(self.module.prepare_bdd_key_tmp_bytes(&self.params.bdd_layout));
+        let mut scratch_p = scratch::new_arena(
+            self.module
+                .prepare_bdd_key_tmp_bytes(&self.params.bdd_layout),
+        );
         bdd_key_prepared.prepare(&self.module, &bdd_key, scratch::borrow(&mut scratch_p));
         Ok(EvaluationKey {
             bdd_key,
@@ -792,13 +795,19 @@ impl Context {
                 &ek.bdd_key_prepared,
             )
         };
-        self.eval_binary(a, b, ek, eval_bytes, |module, _threads, out, ap, bp, key, scratch| {
-            if eval_threads == 1 {
-                out.add(module, ap, bp, key, scratch);
-            } else {
-                out.add_multi_thread(eval_threads, module, ap, bp, key, scratch);
-            }
-        })
+        self.eval_binary(
+            a,
+            b,
+            ek,
+            eval_bytes,
+            |module, _threads, out, ap, bp, key, scratch| {
+                if eval_threads == 1 {
+                    out.add(module, ap, bp, key, scratch);
+                } else {
+                    out.add_multi_thread(eval_threads, module, ap, bp, key, scratch);
+                }
+            },
+        )
     }
 
     /// Homomorphic wrapping subtraction: `a - b`.
@@ -819,9 +828,15 @@ impl Context {
             &self.params.ggsw_layout,
             &ek.bdd_key_prepared,
         );
-        self.eval_binary(a, b, ek, eval_bytes, |module, threads, out, ap, bp, key, scratch| {
-            out.sub_multi_thread(threads, module, ap, bp, key, scratch);
-        })
+        self.eval_binary(
+            a,
+            b,
+            ek,
+            eval_bytes,
+            |module, threads, out, ap, bp, key, scratch| {
+                out.sub_multi_thread(threads, module, ap, bp, key, scratch);
+            },
+        )
     }
 
     /// Homomorphic bitwise AND: `a & b`.
@@ -842,9 +857,15 @@ impl Context {
             &self.params.ggsw_layout,
             &ek.bdd_key_prepared,
         );
-        self.eval_binary(a, b, ek, eval_bytes, |module, threads, out, ap, bp, key, scratch| {
-            out.and_multi_thread(threads, module, ap, bp, key, scratch);
-        })
+        self.eval_binary(
+            a,
+            b,
+            ek,
+            eval_bytes,
+            |module, threads, out, ap, bp, key, scratch| {
+                out.and_multi_thread(threads, module, ap, bp, key, scratch);
+            },
+        )
     }
 
     /// Homomorphic bitwise OR: `a | b`.
@@ -865,9 +886,15 @@ impl Context {
             &self.params.ggsw_layout,
             &ek.bdd_key_prepared,
         );
-        self.eval_binary(a, b, ek, eval_bytes, |module, threads, out, ap, bp, key, scratch| {
-            out.or_multi_thread(threads, module, ap, bp, key, scratch);
-        })
+        self.eval_binary(
+            a,
+            b,
+            ek,
+            eval_bytes,
+            |module, threads, out, ap, bp, key, scratch| {
+                out.or_multi_thread(threads, module, ap, bp, key, scratch);
+            },
+        )
     }
 
     /// Homomorphic bitwise XOR: `a ^ b`.
@@ -888,9 +915,15 @@ impl Context {
             &self.params.ggsw_layout,
             &ek.bdd_key_prepared,
         );
-        self.eval_binary(a, b, ek, eval_bytes, |module, threads, out, ap, bp, key, scratch| {
-            out.xor_multi_thread(threads, module, ap, bp, key, scratch);
-        })
+        self.eval_binary(
+            a,
+            b,
+            ek,
+            eval_bytes,
+            |module, threads, out, ap, bp, key, scratch| {
+                out.xor_multi_thread(threads, module, ap, bp, key, scratch);
+            },
+        )
     }
 
     /// Homomorphic logical left shift: `a << b`.
@@ -911,9 +944,15 @@ impl Context {
             &self.params.ggsw_layout,
             &ek.bdd_key_prepared,
         );
-        self.eval_binary(a, b, ek, eval_bytes, |module, threads, out, ap, bp, key, scratch| {
-            out.sll_multi_thread(threads, module, ap, bp, key, scratch);
-        })
+        self.eval_binary(
+            a,
+            b,
+            ek,
+            eval_bytes,
+            |module, threads, out, ap, bp, key, scratch| {
+                out.sll_multi_thread(threads, module, ap, bp, key, scratch);
+            },
+        )
     }
 
     /// Homomorphic logical right shift: `a >> b` (zero-extending).
@@ -934,9 +973,15 @@ impl Context {
             &self.params.ggsw_layout,
             &ek.bdd_key_prepared,
         );
-        self.eval_binary(a, b, ek, eval_bytes, |module, threads, out, ap, bp, key, scratch| {
-            out.srl_multi_thread(threads, module, ap, bp, key, scratch);
-        })
+        self.eval_binary(
+            a,
+            b,
+            ek,
+            eval_bytes,
+            |module, threads, out, ap, bp, key, scratch| {
+                out.srl_multi_thread(threads, module, ap, bp, key, scratch);
+            },
+        )
     }
 
     /// Homomorphic arithmetic right shift: `a >> b` (sign-extending).
@@ -957,9 +1002,15 @@ impl Context {
             &self.params.ggsw_layout,
             &ek.bdd_key_prepared,
         );
-        self.eval_binary(a, b, ek, eval_bytes, |module, threads, out, ap, bp, key, scratch| {
-            out.sra_multi_thread(threads, module, ap, bp, key, scratch);
-        })
+        self.eval_binary(
+            a,
+            b,
+            ek,
+            eval_bytes,
+            |module, threads, out, ap, bp, key, scratch| {
+                out.sra_multi_thread(threads, module, ap, bp, key, scratch);
+            },
+        )
     }
 
     /// Homomorphic signed less-than: result is `1` if `(a as signed) < (b as signed)`, else `0`.
@@ -980,9 +1031,15 @@ impl Context {
             &self.params.ggsw_layout,
             &ek.bdd_key_prepared,
         );
-        self.eval_binary(a, b, ek, eval_bytes, |module, threads, out, ap, bp, key, scratch| {
-            out.slt_multi_thread(threads, module, ap, bp, key, scratch);
-        })
+        self.eval_binary(
+            a,
+            b,
+            ek,
+            eval_bytes,
+            |module, threads, out, ap, bp, key, scratch| {
+                out.slt_multi_thread(threads, module, ap, bp, key, scratch);
+            },
+        )
     }
 
     /// Homomorphic unsigned less-than: result is `1` if `a < b`, else `0`.
@@ -1003,9 +1060,15 @@ impl Context {
             &self.params.ggsw_layout,
             &ek.bdd_key_prepared,
         );
-        self.eval_binary(a, b, ek, eval_bytes, |module, threads, out, ap, bp, key, scratch| {
-            out.sltu_multi_thread(threads, module, ap, bp, key, scratch);
-        })
+        self.eval_binary(
+            a,
+            b,
+            ek,
+            eval_bytes,
+            |module, threads, out, ap, bp, key, scratch| {
+                out.sltu_multi_thread(threads, module, ap, bp, key, scratch);
+            },
+        )
     }
 }
 
