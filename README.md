@@ -53,12 +53,10 @@ All operations currently require `T = u32` (the only width with compiled BDD cir
 
 ## Backends
 
-Squid defaults to a portable scalar CPU backend. On x86-64 machines with AVX2 and FMA, you can opt into a faster backend:
-
-| Feature flag  | Backend    | Requirements              | Typical speedup |
-|---------------|------------|---------------------------|-----------------|
-| *(default)*   | `FFT64Ref` | Any CPU                   | baseline        |
-| `backend-avx` | `FFT64Avx` | x86-64 with AVX2 + FMA    | ~3–5×           |
+| Feature       | Backend    | Notes                          |
+|---------------|------------|--------------------------------|
+| *(default)*   | `FFT64Ref` | Portable                       |
+| `backend-avx` | `FFT64Avx` | x86-64, AVX2+FMA (~3–5× vs ref) |
 
 ```sh
 RUSTFLAGS="-C target-cpu=native" cargo build --release --features backend-avx

@@ -10,23 +10,25 @@
 //! | *(default)*     | `FFT64Ref`   | Any CPU                       | baseline        |
 //! | `backend-avx`   | `FFT64Avx`   | x86-64 with AVX2 + FMA        | ~3–5×           |
 //!
-//! Enable the AVX backend by passing `--features backend-avx` to Cargo, or adding
-//! it to the `[features]` section of your `Cargo.toml`.  You must also compile
-//! with the required target features:
+//! With `backend-avx` on a non-x86_64 host, the optional AVX crate may still be
+//! linked for feature resolution, but [`BE`] stays `FFT64Ref` (e.g. `cargo clippy --all-features`).
+//!
+//! Poulpy’s AVX code must be compiled with AVX2+FMA available to rustc (`cfg(target_feature)`).
+//! Example (matches README / typical CI):
 //!
 //! ```text
 //! RUSTFLAGS="-C target-cpu=native" cargo build --release --features backend-avx
 //! ```
+//!
+//! Alternatively: `RUSTFLAGS="-C target-feature=+avx2,+fma"`. Runtime CPU checks are still
+//! inside Poulpy.
 
-#[cfg(all(feature = "backend-avx", not(target_arch = "x86_64")))]
-compile_error!("feature `backend-avx` requires target_arch = \"x86_64\".");
+// ── AVX2/FMA-accelerated backend (x86_64 only) ─────────────────────────────
 
-// ── Default: portable scalar f64 FFT backend ────────────────────────────────
-
-#[cfg(not(feature = "backend-avx"))]
-pub(crate) use poulpy_cpu_ref::FFT64Ref as BE;
-
-// ── Optional: AVX2/FMA-accelerated backend ───────────────────────────────────
-
-#[cfg(feature = "backend-avx")]
+#[cfg(all(feature = "backend-avx", target_arch = "x86_64"))]
 pub(crate) use poulpy_cpu_avx::FFT64Avx as BE;
+
+// ── Portable scalar f64 FFT backend (default and non-x86 with `backend-avx`) ─
+
+#[cfg(not(all(feature = "backend-avx", target_arch = "x86_64")))]
+pub(crate) use poulpy_cpu_ref::FFT64Ref as BE;
