@@ -22,9 +22,8 @@ use std::io::{self, Cursor};
 use poulpy_core::{
     layouts::{
         prepared::GLWESecretPreparedFactory, Base2K, Degree, Dnum, Dsize, GGLWEToGGSWKeyLayout,
-        GGSWLayout, GLWEAutomorphismKeyLayout, GLWELayout, GLWESecret,
-        GLWESwitchingKeyLayout, GLWEToLWEKeyLayout, GLWEToMut, LWESecret, Rank,
-        TorusPrecision,
+        GGSWLayout, GLWEAutomorphismKeyLayout, GLWELayout, GLWESecret, GLWESwitchingKeyLayout,
+        GLWEToLWEKeyLayout, GLWEToMut, LWESecret, Rank, TorusPrecision,
     },
     EncryptionLayout,
 };
