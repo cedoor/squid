@@ -11,29 +11,33 @@
 //! let mut ctx = Context::new(Params::unsecure()).with_options(ContextOptions::default());
 //! let (sk, ek) = ctx.keygen();
 //!
-//! let a = ctx.encrypt::<u32>(42, &sk);
-//! let b = ctx.encrypt::<u32>(7, &sk);
+//! let a = ctx.encrypt::<u32>(42, &sk, &ek);
+//! let b = ctx.encrypt::<u32>(7, &sk, &ek);
 //! let c = ctx.add(&a, &b, &ek);
 //! let result: u32 = ctx.decrypt(&c, &sk);
 //! ```
 
 use std::io::{self, Cursor};
 
-use poulpy_core::layouts::{
-    Base2K, Degree, Dnum, Dsize, GGLWEToGGSWKeyLayout, GGSWLayout, GLWEAutomorphismKeyLayout,
-    GLWEInfos, GLWELayout, GLWESecret, GLWESecretPrepared, GLWESwitchingKeyLayout,
-    GLWEToLWEKeyLayout, GLWEToMut, LWEInfos, LWESecret, Rank, TorusPrecision,
+use poulpy_core::{
+    layouts::{
+        prepared::GLWESecretPreparedFactory, Base2K, Degree, Dnum, Dsize, GGLWEToGGSWKeyLayout,
+        GGSWLayout, GLWEAutomorphismKeyLayout, GLWEInfos, GLWELayout, GLWESecret,
+        GLWESwitchingKeyLayout, GLWEToLWEKeyLayout, GLWEToMut, LWEInfos, LWESecret, Rank,
+        TorusPrecision,
+    },
+    EncryptionLayout,
 };
 use poulpy_hal::{
     api::ModuleNew,
-    layouts::{Module, ReaderFrom},
+    layouts::{DeviceBuf, Module, ReaderFrom},
     source::Source,
 };
 use poulpy_schemes::bin_fhe::{
     bdd_arithmetic::{
-        Add, And, BDDKey, BDDKeyEncryptSk, BDDKeyLayout, BDDKeyPrepared, BDDKeyPreparedFactory,
-        FheUint, FheUintPrepare, FheUintPrepared, FromBits, Or, Sll, Slt, Sltu, Sra, Srl, Sub,
-        ToBits, UnsignedInteger, Xor,
+        Add, And, BDDEncryptionInfos, BDDKey, BDDKeyEncryptSk, BDDKeyLayout, BDDKeyPrepared,
+        BDDKeyPreparedFactory, FheUint, FheUintPrepared, FromBits, Or, Sll, Slt, Sltu, Sra, Srl,
+        Sub, ToBits, UnsignedInteger, Xor,
     },
     blind_rotation::{BlindRotationKeyLayout, CGGI},
     circuit_bootstrapping::CircuitBootstrappingKeyLayout,
@@ -294,8 +298,10 @@ impl Params {
 
 /// The main entry point for all FHE operations.
 ///
-/// `Context` owns the Poulpy [`Module`] (precomputed FFT tables), the scratch
-/// arena, and the chosen [`Params`].  It does **not** own any key material;
+/// `Context` owns the Poulpy [`Module`] (precomputed FFT tables) and the chosen
+/// [`Params`].  Scratch space is allocated per operation using Poulpy’s
+/// `*_tmp_bytes` helpers (same pattern as Poulpy’s examples and tests).  It does
+/// **not** own any key material;
 /// keys are returned from [`Context::keygen`] and passed back into each
 /// operation so callers control their lifecycle.
 ///
@@ -306,7 +312,6 @@ impl Params {
 pub struct Context {
     params: Params,
     module: Mod,
-    arena: scratch::Arena,
     options: ContextOptions,
 }
 
@@ -317,26 +322,20 @@ impl Context {
     /// [`Context::with_options`] to change that, e.g.
     /// `Context::new(params).with_options(ContextOptions { eval_threads: 4 })`.
     ///
-    /// Allocates the FFT tables and scratch arena.  This is the most expensive
-    /// one-time setup cost; key generation and evaluation are the runtime costs.
+    /// Allocates the FFT tables.  Scratch is allocated per-operation on the
+    /// encrypt/decrypt/keygen/eval paths; see Poulpy’s `*_tmp_bytes` sizing.
     pub fn new(params: Params) -> Self {
         let options = ContextOptions::default();
         assert_eval_threads(options.eval_threads);
         let module = Mod::new(params.n_glwe as u64);
-        let bytes = compute_arena_bytes(&module, &params, options.eval_threads);
-        let arena = scratch::new_arena(bytes);
         Context {
             params,
             module,
-            arena,
             options,
         }
     }
 
     /// Applies runtime options, replacing any previous [`ContextOptions`].
-    ///
-    /// Reallocates the scratch arena for this [`Params`] and the new
-    /// [`ContextOptions::eval_threads`] (worst-case size from Poulpy’s scratch helpers).
     ///
     /// # Panics
     ///
@@ -344,8 +343,6 @@ impl Context {
     pub fn with_options(mut self, options: ContextOptions) -> Self {
         assert_eval_threads(options.eval_threads);
         self.options = options;
-        let bytes = compute_arena_bytes(&self.module, &self.params, self.options.eval_threads);
-        self.arena = scratch::new_arena(bytes);
         self
     }
 
@@ -367,12 +364,9 @@ impl Context {
     pub fn set_options(&mut self, options: ContextOptions) {
         assert_eval_threads(options.eval_threads);
         self.options = options;
-        let bytes = compute_arena_bytes(&self.module, &self.params, self.options.eval_threads);
-        self.arena = scratch::new_arena(bytes);
     }
 
-    /// Sets only [`ContextOptions::eval_threads`].  Reallocates the scratch arena
-    /// like [`Context::with_options`].
+    /// Sets only [`ContextOptions::eval_threads`] (same rules as [`Context::with_options`]).
     ///
     /// # Panics
     ///
@@ -441,20 +435,35 @@ impl Context {
         let mut source_xe = Source::new(seeds.bdd_noise);
 
         // BDD evaluation key (standard form)
+        let bdd_enc_infos = BDDEncryptionInfos::from_default_sigma(&self.params.bdd_layout)
+            .expect("default BDD encryption sigma");
         let mut bdd_key: BDDKey<Vec<u8>, CGGI> = BDDKey::alloc_from_infos(&self.params.bdd_layout);
+        let keygen_bytes = self
+            .module
+            .bdd_key_encrypt_sk_tmp_bytes(&self.params.bdd_layout)
+            .max(
+                self.module
+                    .prepare_bdd_key_tmp_bytes(&self.params.bdd_layout),
+            );
+        let mut keygen_arena = scratch::new_arena(keygen_bytes);
+        let scratch = scratch::borrow(&mut keygen_arena);
         bdd_key.encrypt_sk(
             &self.module,
             &sk.sk_lwe,
             &sk.sk_glwe,
-            &mut source_xa,
+            &bdd_enc_infos,
             &mut source_xe,
-            scratch::borrow(&mut self.arena),
+            &mut source_xa,
+            scratch,
         );
 
         // BDD evaluation key (prepared / DFT form)
-        let mut bdd_key_prepared: BDDKeyPrepared<Vec<u8>, CGGI, crate::backend::BE> =
-            BDDKeyPrepared::alloc_from_infos(&self.module, &self.params.bdd_layout);
-        bdd_key_prepared.prepare(&self.module, &bdd_key, scratch::borrow(&mut self.arena));
+        let mut bdd_key_prepared: BDDKeyPrepared<
+            DeviceBuf<crate::backend::BE>,
+            CGGI,
+            crate::backend::BE,
+        > = BDDKeyPrepared::alloc_from_infos(&self.module, &self.params.bdd_layout);
+        bdd_key_prepared.prepare(&self.module, &bdd_key, scratch);
 
         let ek = EvaluationKey {
             bdd_key,
@@ -481,9 +490,10 @@ impl Context {
         let mut sk_lwe = LWESecret::alloc(self.params.bdd_layout.cbt_layout.brk_layout.n_lwe);
         sk_lwe.fill_binary_block(self.params.binary_block_size as usize, source_xs);
 
-        let mut sk_glwe_prepared =
-            GLWESecretPrepared::alloc_from_infos(&self.module, &self.params.glwe_layout);
-        sk_glwe_prepared.prepare(&self.module, &sk_glwe);
+        let mut sk_glwe_prepared = self
+            .module
+            .glwe_secret_prepared_alloc_from_infos(&self.params.glwe_layout);
+        self.module.glwe_secret_prepare(&mut sk_glwe_prepared, &sk_glwe);
 
         SecretKey {
             sk_glwe,
@@ -528,9 +538,14 @@ impl Context {
                 "trailing bytes in evaluation key blob",
             ));
         }
-        let mut bdd_key_prepared =
-            BDDKeyPrepared::alloc_from_infos(&self.module, &self.params.bdd_layout);
-        bdd_key_prepared.prepare(&self.module, &bdd_key, scratch::borrow(&mut self.arena));
+        let mut bdd_key_prepared: BDDKeyPrepared<
+            DeviceBuf<crate::backend::BE>,
+            CGGI,
+            crate::backend::BE,
+        > = BDDKeyPrepared::alloc_from_infos(&self.module, &self.params.bdd_layout);
+        let mut scratch_p =
+            scratch::new_arena(self.module.prepare_bdd_key_tmp_bytes(&self.params.bdd_layout));
+        bdd_key_prepared.prepare(&self.module, &bdd_key, scratch::borrow(&mut scratch_p));
         Ok(EvaluationKey {
             bdd_key,
             bdd_key_prepared,
@@ -593,7 +608,7 @@ impl Context {
         let gl = &self.params.glwe_layout;
         if fhe_uint.n() != gl.n
             || fhe_uint.base2k() != gl.base2k
-            || fhe_uint.k() != gl.k
+            || fhe_uint.max_k() != gl.k
             || fhe_uint.rank() != gl.rank
         {
             return Err(io::Error::new(
@@ -607,32 +622,79 @@ impl Context {
                 "trailing bytes in ciphertext blob",
             ));
         }
-        Ok(Ciphertext { inner: fhe_uint })
+        Ok(Ciphertext {
+            inner: fhe_uint,
+            prepared: None,
+        })
     }
 
     // ── Encrypt / Decrypt ────────────────────────────────────────────────────
 
     /// Encrypt a plaintext value under the given secret key.
     ///
+    /// Internally encrypts directly to the prepared (DFT-domain) form via
+    /// `FheUintPrepared::encrypt_sk`, then packs to a standard `FheUint` via
+    /// `from_fhe_uint_prepared` (which is why an [`EvaluationKey`] is required).
+    /// This matches the path validated by Poulpy's `test_bdd_add` and avoids the
+    /// `FheUint::encrypt_sk -> FheUintPrepared::prepare` pipeline, which is
+    /// currently broken upstream (`b598566`).
+    ///
+    /// The cached prepared form is consumed by homomorphic ops; the packed
+    /// inner form is used for [`Context::decrypt`] and serialization.
+    ///
     /// `T` must be one of `u8`, `u16`, `u32`, `u64`, `u128`.  Note that
     /// homomorphic arithmetic operations are currently only implemented for
     /// `u32` (the only type with compiled BDD circuits in `poulpy-schemes`).
-    pub fn encrypt<T>(&mut self, value: T, sk: &SecretKey) -> Ciphertext<T>
+    pub fn encrypt<T>(&mut self, value: T, sk: &SecretKey, ek: &EvaluationKey) -> Ciphertext<T>
     where
-        T: UnsignedInteger + ToBits,
+        T: UnsignedInteger + ToBits + FromBits,
     {
         let mut source_xa = random_source();
         let mut source_xe = random_source();
-        let mut fhe_uint = FheUint::alloc_from_infos(&self.params.glwe_layout);
-        fhe_uint.encrypt_sk(
+        let ggsw_enc_infos = EncryptionLayout::new_from_default_sigma(self.params.ggsw_layout)
+            .expect("default GGSW encryption sigma");
+
+        // TODO(poulpy-bug): switch to dynamic sizing once poulpy fixes the
+        // upstream `FheUint::encrypt_sk -> FheUintPrepared::prepare` bug
+        // (see `crate::ciphertext` module docs).  Once fixed, encrypt should
+        // route through that path and use `FheUint::encrypt_sk_tmp_bytes` +
+        // `Module::fhe_uint_prepare_tmp_bytes` for exact scratch sizing.
+        //
+        // Until then we work around the bug via `FheUintPrepared::encrypt_sk`
+        // followed by `FheUint::from_fhe_uint_prepared`.  Poulpy exposes no
+        // wrapper-level `*_tmp_bytes` helpers for either, and hand-composing
+        // from primitives is fragile (both wrappers call into deeper helpers
+        // like `glwe_pack -> glwe_trace` whose runtime scratch checks don't
+        // match a naive sum of public `_tmp_bytes`).  Poulpy's own
+        // `bdd_arithmetic` example/tests use a single 4 MiB arena for the
+        // whole pipeline; we do the same here for these two sequential ops.
+        const ENCRYPT_SCRATCH_BYTES: usize = 1 << 22;
+        let mut scratch_arena = scratch::new_arena(ENCRYPT_SCRATCH_BYTES);
+
+        let mut prepared: FheUintPrepared<DeviceBuf<crate::backend::BE>, T, crate::backend::BE> =
+            FheUintPrepared::alloc_from_infos(&self.module, &self.params.ggsw_layout);
+        prepared.encrypt_sk(
             &self.module,
             value,
             &sk.sk_glwe_prepared,
-            &mut source_xa,
+            &ggsw_enc_infos,
             &mut source_xe,
-            scratch::borrow(&mut self.arena),
+            &mut source_xa,
+            scratch::borrow(&mut scratch_arena),
         );
-        Ciphertext { inner: fhe_uint }
+
+        let mut packed: FheUint<Vec<u8>, T> = FheUint::alloc_from_infos(&self.params.glwe_layout);
+        packed.from_fhe_uint_prepared(
+            &self.module,
+            &prepared,
+            &ek.bdd_key_prepared,
+            scratch::borrow(&mut scratch_arena),
+        );
+
+        Ciphertext {
+            inner: packed,
+            prepared: Some(prepared),
+        }
     }
 
     /// Decrypt a ciphertext and return the plaintext value.
@@ -640,28 +702,29 @@ impl Context {
     where
         T: UnsignedInteger + FromBits,
     {
+        let dec_bytes = ct.inner.decrypt_tmp_bytes(&self.module);
+        let mut scratch_d = scratch::new_arena(dec_bytes);
         ct.inner.decrypt(
             &self.module,
             &sk.sk_glwe_prepared,
-            scratch::borrow(&mut self.arena),
+            scratch::borrow(&mut scratch_d),
         )
     }
 
     // ── Internal helper ───────────────────────────────────────────────────────
 
-    /// Prepare two ciphertexts, run `op`, and return the result.
+    /// Run a binary op on the prepared form of `a` and `b`.
     ///
-    /// All arithmetic operations share this pattern:
-    /// 1. Allocate and populate `FheUintPrepared` for `a` and `b`.
-    /// 2. Allocate output `FheUint`.
-    /// 3. Invoke `op` on it.
-    ///
-    /// Uses [`ContextOptions::eval_threads`] for Poulpy's `*_multi_thread` BDD evaluators.
+    /// Both inputs must carry their prepared cache (i.e. come straight from
+    /// [`Context::encrypt`]). Op outputs and deserialized ciphertexts have
+    /// no cache and panic with a clear message — see the [`crate::ciphertext`]
+    /// module docs for the upstream limitation.
     fn eval_binary<T, F>(
         &mut self,
         a: &Ciphertext<T>,
         b: &Ciphertext<T>,
         ek: &EvaluationKey,
+        eval_scratch_bytes: usize,
         op: F,
     ) -> Ciphertext<T>
     where
@@ -670,42 +733,33 @@ impl Context {
             &Mod,
             usize,
             &mut FheUint<Vec<u8>, T>,
-            &FheUintPrepared<Vec<u8>, T, crate::backend::BE>,
-            &FheUintPrepared<Vec<u8>, T, crate::backend::BE>,
-            &BDDKeyPrepared<Vec<u8>, CGGI, crate::backend::BE>,
+            &FheUintPrepared<DeviceBuf<crate::backend::BE>, T, crate::backend::BE>,
+            &FheUintPrepared<DeviceBuf<crate::backend::BE>, T, crate::backend::BE>,
+            &BDDKeyPrepared<DeviceBuf<crate::backend::BE>, CGGI, crate::backend::BE>,
             &mut poulpy_hal::layouts::Scratch<crate::backend::BE>,
         ),
     {
-        let eval_threads = self.options.eval_threads;
-        let mut a_prep: FheUintPrepared<Vec<u8>, T, crate::backend::BE> =
-            FheUintPrepared::alloc_from_infos(&self.module, &self.params.ggsw_layout);
-        a_prep.prepare::<CGGI, _, _, _, _>(
-            &self.module,
-            &a.inner,
-            &ek.bdd_key_prepared,
-            scratch::borrow(&mut self.arena),
-        );
-
-        let mut b_prep: FheUintPrepared<Vec<u8>, T, crate::backend::BE> =
-            FheUintPrepared::alloc_from_infos(&self.module, &self.params.ggsw_layout);
-        b_prep.prepare::<CGGI, _, _, _, _>(
-            &self.module,
-            &b.inner,
-            &ek.bdd_key_prepared,
-            scratch::borrow(&mut self.arena),
-        );
+        const NO_PREPARED_CACHE: &str =
+            "ciphertext lacks prepared cache; only freshly encrypted ciphertexts can be operated \
+             on in this Poulpy revision (see ciphertext module docs)";
+        let a_prep = a.prepared.as_ref().expect(NO_PREPARED_CACHE);
+        let b_prep = b.prepared.as_ref().expect(NO_PREPARED_CACHE);
 
         let mut out: FheUint<Vec<u8>, T> = FheUint::alloc_from_infos(&self.params.glwe_layout);
+        let mut scratch_eval = scratch::new_arena(eval_scratch_bytes);
         op(
             &self.module,
-            eval_threads,
+            self.options.eval_threads,
             &mut out,
-            &a_prep,
-            &b_prep,
+            a_prep,
+            b_prep,
             &ek.bdd_key_prepared,
-            scratch::borrow(&mut self.arena),
+            scratch::borrow(&mut scratch_eval),
         );
-        Ciphertext { inner: out }
+        Ciphertext {
+            inner: out,
+            prepared: None,
+        }
     }
 
     // ── Arithmetic and logical operations ────────────────────────────────────
@@ -721,8 +775,29 @@ impl Context {
         T: UnsignedInteger,
         FheUint<Vec<u8>, T>: Add<T, crate::backend::BE>,
     {
-        self.eval_binary(a, b, ek, |module, threads, out, ap, bp, key, scratch| {
-            out.add_multi_thread(threads, module, ap, bp, key, scratch);
+        let eval_threads = self.options.eval_threads;
+        let eval_bytes = if eval_threads == 1 {
+            a.inner.add_tmp_bytes(
+                &self.module,
+                &self.params.glwe_layout,
+                &self.params.ggsw_layout,
+                &ek.bdd_key_prepared,
+            )
+        } else {
+            a.inner.add_multi_thread_tmp_bytes(
+                &self.module,
+                eval_threads,
+                &self.params.glwe_layout,
+                &self.params.ggsw_layout,
+                &ek.bdd_key_prepared,
+            )
+        };
+        self.eval_binary(a, b, ek, eval_bytes, |module, _threads, out, ap, bp, key, scratch| {
+            if eval_threads == 1 {
+                out.add(module, ap, bp, key, scratch);
+            } else {
+                out.add_multi_thread(eval_threads, module, ap, bp, key, scratch);
+            }
         })
     }
 
@@ -737,7 +812,14 @@ impl Context {
         T: UnsignedInteger,
         FheUint<Vec<u8>, T>: Sub<T, crate::backend::BE>,
     {
-        self.eval_binary(a, b, ek, |module, threads, out, ap, bp, key, scratch| {
+        let eval_bytes = a.inner.sub_multi_thread_tmp_bytes(
+            &self.module,
+            self.options.eval_threads,
+            &self.params.glwe_layout,
+            &self.params.ggsw_layout,
+            &ek.bdd_key_prepared,
+        );
+        self.eval_binary(a, b, ek, eval_bytes, |module, threads, out, ap, bp, key, scratch| {
             out.sub_multi_thread(threads, module, ap, bp, key, scratch);
         })
     }
@@ -753,7 +835,14 @@ impl Context {
         T: UnsignedInteger,
         FheUint<Vec<u8>, T>: And<T, crate::backend::BE>,
     {
-        self.eval_binary(a, b, ek, |module, threads, out, ap, bp, key, scratch| {
+        let eval_bytes = a.inner.and_multi_thread_tmp_bytes(
+            &self.module,
+            self.options.eval_threads,
+            &self.params.glwe_layout,
+            &self.params.ggsw_layout,
+            &ek.bdd_key_prepared,
+        );
+        self.eval_binary(a, b, ek, eval_bytes, |module, threads, out, ap, bp, key, scratch| {
             out.and_multi_thread(threads, module, ap, bp, key, scratch);
         })
     }
@@ -769,7 +858,14 @@ impl Context {
         T: UnsignedInteger,
         FheUint<Vec<u8>, T>: Or<T, crate::backend::BE>,
     {
-        self.eval_binary(a, b, ek, |module, threads, out, ap, bp, key, scratch| {
+        let eval_bytes = a.inner.or_multi_thread_tmp_bytes(
+            &self.module,
+            self.options.eval_threads,
+            &self.params.glwe_layout,
+            &self.params.ggsw_layout,
+            &ek.bdd_key_prepared,
+        );
+        self.eval_binary(a, b, ek, eval_bytes, |module, threads, out, ap, bp, key, scratch| {
             out.or_multi_thread(threads, module, ap, bp, key, scratch);
         })
     }
@@ -785,7 +881,14 @@ impl Context {
         T: UnsignedInteger,
         FheUint<Vec<u8>, T>: Xor<T, crate::backend::BE>,
     {
-        self.eval_binary(a, b, ek, |module, threads, out, ap, bp, key, scratch| {
+        let eval_bytes = a.inner.xor_multi_thread_tmp_bytes(
+            &self.module,
+            self.options.eval_threads,
+            &self.params.glwe_layout,
+            &self.params.ggsw_layout,
+            &ek.bdd_key_prepared,
+        );
+        self.eval_binary(a, b, ek, eval_bytes, |module, threads, out, ap, bp, key, scratch| {
             out.xor_multi_thread(threads, module, ap, bp, key, scratch);
         })
     }
@@ -801,7 +904,14 @@ impl Context {
         T: UnsignedInteger,
         FheUint<Vec<u8>, T>: Sll<T, crate::backend::BE>,
     {
-        self.eval_binary(a, b, ek, |module, threads, out, ap, bp, key, scratch| {
+        let eval_bytes = a.inner.sll_multi_thread_tmp_bytes(
+            &self.module,
+            self.options.eval_threads,
+            &self.params.glwe_layout,
+            &self.params.ggsw_layout,
+            &ek.bdd_key_prepared,
+        );
+        self.eval_binary(a, b, ek, eval_bytes, |module, threads, out, ap, bp, key, scratch| {
             out.sll_multi_thread(threads, module, ap, bp, key, scratch);
         })
     }
@@ -817,7 +927,14 @@ impl Context {
         T: UnsignedInteger,
         FheUint<Vec<u8>, T>: Srl<T, crate::backend::BE>,
     {
-        self.eval_binary(a, b, ek, |module, threads, out, ap, bp, key, scratch| {
+        let eval_bytes = a.inner.srl_multi_thread_tmp_bytes(
+            &self.module,
+            self.options.eval_threads,
+            &self.params.glwe_layout,
+            &self.params.ggsw_layout,
+            &ek.bdd_key_prepared,
+        );
+        self.eval_binary(a, b, ek, eval_bytes, |module, threads, out, ap, bp, key, scratch| {
             out.srl_multi_thread(threads, module, ap, bp, key, scratch);
         })
     }
@@ -833,7 +950,14 @@ impl Context {
         T: UnsignedInteger,
         FheUint<Vec<u8>, T>: Sra<T, crate::backend::BE>,
     {
-        self.eval_binary(a, b, ek, |module, threads, out, ap, bp, key, scratch| {
+        let eval_bytes = a.inner.sra_multi_thread_tmp_bytes(
+            &self.module,
+            self.options.eval_threads,
+            &self.params.glwe_layout,
+            &self.params.ggsw_layout,
+            &ek.bdd_key_prepared,
+        );
+        self.eval_binary(a, b, ek, eval_bytes, |module, threads, out, ap, bp, key, scratch| {
             out.sra_multi_thread(threads, module, ap, bp, key, scratch);
         })
     }
@@ -849,7 +973,14 @@ impl Context {
         T: UnsignedInteger,
         FheUint<Vec<u8>, T>: Slt<T, crate::backend::BE>,
     {
-        self.eval_binary(a, b, ek, |module, threads, out, ap, bp, key, scratch| {
+        let eval_bytes = a.inner.slt_multi_thread_tmp_bytes(
+            &self.module,
+            self.options.eval_threads,
+            &self.params.glwe_layout,
+            &self.params.ggsw_layout,
+            &ek.bdd_key_prepared,
+        );
+        self.eval_binary(a, b, ek, eval_bytes, |module, threads, out, ap, bp, key, scratch| {
             out.slt_multi_thread(threads, module, ap, bp, key, scratch);
         })
     }
@@ -865,72 +996,20 @@ impl Context {
         T: UnsignedInteger,
         FheUint<Vec<u8>, T>: Sltu<T, crate::backend::BE>,
     {
-        self.eval_binary(a, b, ek, |module, threads, out, ap, bp, key, scratch| {
+        let eval_bytes = a.inner.sltu_multi_thread_tmp_bytes(
+            &self.module,
+            self.options.eval_threads,
+            &self.params.glwe_layout,
+            &self.params.ggsw_layout,
+            &ek.bdd_key_prepared,
+        );
+        self.eval_binary(a, b, ek, eval_bytes, |module, threads, out, ap, bp, key, scratch| {
             out.sltu_multi_thread(threads, module, ap, bp, key, scratch);
         })
     }
 }
 
 // ── Internal utilities ────────────────────────────────────────────────────────
-
-/// Compute the exact scratch arena size required for all operations in the
-/// pipeline by taking the `max` across every scratch-taking category.
-/// The arena is reused sequentially, so the worst-case single operation
-/// determines the required size.
-fn compute_arena_bytes(module: &Mod, params: &Params, eval_threads: usize) -> usize {
-    let keygen_encrypt = module.bdd_key_encrypt_sk_tmp_bytes(&params.bdd_layout);
-    let keygen_prepare = module.prepare_bdd_key_tmp_bytes(&params.bdd_layout);
-    let fhe_prepare = module.fhe_uint_prepare_tmp_bytes(
-        params.binary_block_size as usize,
-        1usize,
-        &params.ggsw_layout,
-        &params.glwe_layout,
-        &params.bdd_layout,
-    );
-
-    // encrypt_sk_tmp_bytes / decrypt_tmp_bytes are &self instance methods on
-    // FheUint — a dummy is needed for dispatch. It's a one-time ~32 KB
-    // allocation freed immediately after sizing.
-    let dummy: FheUint<Vec<u8>, u32> = FheUint::alloc_from_infos(&params.glwe_layout);
-    let encrypt = dummy.encrypt_sk_tmp_bytes(module);
-    let decrypt = dummy.decrypt_tmp_bytes(module);
-
-    // Each BDD circuit has a different max_state_size, so all 10 ops are
-    // queried and the max is taken. Poulpy's `*_tmp_bytes` helpers require a
-    // prepared evaluation key (`GLWEAutomorphismKeyHelper`), not raw layouts.
-    let bdd_key_prepared: BDDKeyPrepared<Vec<u8>, CGGI, crate::backend::BE> =
-        BDDKeyPrepared::alloc_from_infos(module, &params.bdd_layout);
-    let g = &params.ggsw_layout;
-    let r = &params.glwe_layout;
-    let t = eval_threads;
-    let eval = [
-        dummy.add_multi_thread_tmp_bytes(module, t, r, g, &bdd_key_prepared),
-        dummy.sub_multi_thread_tmp_bytes(module, t, r, g, &bdd_key_prepared),
-        dummy.and_multi_thread_tmp_bytes(module, t, r, g, &bdd_key_prepared),
-        dummy.or_multi_thread_tmp_bytes(module, t, r, g, &bdd_key_prepared),
-        dummy.xor_multi_thread_tmp_bytes(module, t, r, g, &bdd_key_prepared),
-        dummy.sll_multi_thread_tmp_bytes(module, t, r, g, &bdd_key_prepared),
-        dummy.srl_multi_thread_tmp_bytes(module, t, r, g, &bdd_key_prepared),
-        dummy.sra_multi_thread_tmp_bytes(module, t, r, g, &bdd_key_prepared),
-        dummy.slt_multi_thread_tmp_bytes(module, t, r, g, &bdd_key_prepared),
-        dummy.sltu_multi_thread_tmp_bytes(module, t, r, g, &bdd_key_prepared),
-    ]
-    .into_iter()
-    .max()
-    .unwrap_or(0);
-
-    [
-        keygen_encrypt,
-        keygen_prepare,
-        fhe_prepare,
-        encrypt,
-        decrypt,
-        eval,
-    ]
-    .into_iter()
-    .max()
-    .unwrap_or(0)
-}
 
 /// Construct a [`Source`] seeded from OS randomness.
 fn random_source() -> Source {

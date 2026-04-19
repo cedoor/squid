@@ -9,9 +9,9 @@ license = "MIT"
 backend-avx = ["dep:poulpy-cpu-avx"]
 
 [dependencies]
-poulpy-core = { git = "https://github.com/cedoor/poulpy.git", branch = "feat/serialization-key-types" }
-poulpy-schemes = { git = "https://github.com/cedoor/poulpy.git", branch = "feat/serialization-key-types" }
-poulpy-hal = { git = "https://github.com/cedoor/poulpy.git", branch = "feat/serialization-key-types" }
-poulpy-cpu-ref = { git = "https://github.com/cedoor/poulpy.git", branch = "feat/serialization-key-types" }
-poulpy-cpu-avx = { git = "https://github.com/cedoor/poulpy.git", branch = "feat/serialization-key-types", optional = true }
+poulpy-core = { git = "https://github.com/poulpy-fhe/poulpy.git", rev = "b598566cef299a20ac9b159eef61aeadbf66f968" }
+poulpy-schemes = { git = "https://github.com/poulpy-fhe/poulpy.git", rev = "b598566cef299a20ac9b159eef61aeadbf66f968" }
+poulpy-hal = { git = "https://github.com/poulpy-fhe/poulpy.git", rev = "b598566cef299a20ac9b159eef61aeadbf66f968" }
+poulpy-cpu-ref = { git = "https://github.com/poulpy-fhe/poulpy.git", rev = "b598566cef299a20ac9b159eef61aeadbf66f968" }
+poulpy-cpu-avx = { git = "https://github.com/poulpy-fhe/poulpy.git", rev = "b598566cef299a20ac9b159eef61aeadbf66f968", optional = true }
 getrandom = "0.3"

@@ -45,8 +45,8 @@ fn secret_key_from_lattice_seed_matches_full_keygen_lattice_part() {
 fn keygen_from_seeds_homomorphic_smoke() {
     let mut ctx = Context::new(Params::test());
     let (sk, ek) = ctx.keygen_from_seeds(SEEDS);
-    let x = ctx.encrypt::<u32>(10, &sk);
-    let y = ctx.encrypt::<u32>(20, &sk);
+    let x = ctx.encrypt::<u32>(10, &sk, &ek);
+    let y = ctx.encrypt::<u32>(20, &sk, &ek);
     let z = ctx.add(&x, &y, &ek);
     assert_eq!(ctx.decrypt(&z, &sk), 30);
 }

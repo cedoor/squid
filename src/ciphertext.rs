@@ -1,9 +1,19 @@
 //! The user-facing ciphertext type.
 //!
-//! [`Ciphertext<T>`] is a thin newtype over Poulpy's `FheUint<Vec<u8>, T>`.
-//! It is the only ciphertext form users ever see.  The prepared (DFT-domain)
-//! form `FheUintPrepared` is an implementation detail that lives temporarily
-//! inside [`crate::context::Context`] during operation evaluation.
+//! [`Ciphertext<T>`] wraps Poulpy's packed `FheUint<Vec<u8>, T>` (the wire
+//! format) and additionally caches the prepared (DFT-domain) `FheUintPrepared`
+//! produced at encryption time.  Homomorphic ops consume the prepared cache;
+//! [`Context::decrypt`](crate::context::Context::decrypt) and
+//! [`Ciphertext::serialize`] use the packed form only.
+//!
+//! ## Chaining limitation
+//!
+//! In the currently pinned Poulpy revision, the `FheUint -> FheUintPrepared`
+//! re-prepare path produces incorrect results, so a ciphertext that has lost
+//! its prepared cache (an op result, or a freshly deserialized blob) cannot be
+//! used as input to another homomorphic op. Doing so panics with a descriptive
+//! message. This restriction will lift as upstream Poulpy stabilizes that
+//! pipeline.
 //!
 //! Standard-form wire encoding is [`Ciphertext::serialize`] /
 //! [`Ciphertext::deserialize`] / [`crate::context::Context::serialize_ciphertext`] /
@@ -13,8 +23,8 @@
 use std::io;
 
 use poulpy_core::layouts::GLWEToRef;
-use poulpy_hal::layouts::WriterTo;
-use poulpy_schemes::bin_fhe::bdd_arithmetic::{FheUint, UnsignedInteger};
+use poulpy_hal::layouts::{DeviceBuf, WriterTo};
+use poulpy_schemes::bin_fhe::bdd_arithmetic::{FheUint, FheUintPrepared, UnsignedInteger};
 
 use crate::context::Context;
 
@@ -29,20 +39,21 @@ pub(crate) const CIPHERTEXT_BLOB_VERSION: u8 = 1;
 ///
 /// ## Lifecycle
 ///
-/// 1. Create with [`crate::Context::encrypt`].
+/// 1. Create with [`crate::Context::encrypt`] (caches the prepared form for ops).
 /// 2. Pass to homomorphic operations (`ctx.add`, `ctx.xor`, …).
 /// 3. Recover the plaintext with [`crate::Context::decrypt`].
-///
-/// The ciphertext is in standard (serializable) form at all times from the
-/// caller's perspective.  Conversion to the prepared DFT-domain form happens
-/// internally inside each operation call and is not visible here.
 pub struct Ciphertext<T: UnsignedInteger> {
     pub(crate) inner: FheUint<Vec<u8>, T>,
+    pub(crate) prepared:
+        Option<FheUintPrepared<DeviceBuf<crate::backend::BE>, T, crate::backend::BE>>,
 }
 
 impl<T: UnsignedInteger> Ciphertext<T> {
     /// Serializes the packed GLWE ciphertext (little-endian, versioned). The plaintext type `T`
     /// is recorded in the blob; use the same `T` with [`Ciphertext::deserialize`].
+    ///
+    /// The prepared cache is **not** serialized; deserialized ciphertexts can only be
+    /// decrypted (see module-level note about chaining).
     ///
     /// Same as [`crate::context::Context::serialize_ciphertext`] with this value.
     pub fn serialize(&self) -> io::Result<Vec<u8>> {
