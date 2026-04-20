@@ -10,6 +10,8 @@ Poulpy is a low-level, modular toolkit exposing the full machinery of lattice-ba
 
 ## Usage
 
+### Quick start
+
 ```rust
 use squid::{Context, Params};
 
@@ -33,6 +35,82 @@ fn main() {
     println!("255 + 30 = {result}");
 }
 ```
+
+### Serialize / deserialize an evaluation key
+
+The evaluation key is public material needed for every homomorphic op. Persist
+it once and reload it on the server that runs the circuits. The blob is
+versioned and tied to the [`Params`](src/context.rs) used at keygen — loading
+under different parameters returns an `io::Error`.
+
+```rust
+use squid::{Context, EvaluationKey, Params};
+
+let mut ctx = Context::new(Params::unsecure());
+let (_sk, ek) = ctx.keygen();
+
+// Serialize to a versioned little-endian blob.
+let blob: Vec<u8> = ctx.serialize_evaluation_key(&ek).unwrap();
+std::fs::write("ek.bin", &blob).unwrap();
+
+// Reload later, under the same Params, into a fresh Context.
+let mut ctx = Context::new(Params::unsecure());
+let bytes = std::fs::read("ek.bin").unwrap();
+let ek: EvaluationKey = ctx.deserialize_evaluation_key(&bytes).unwrap();
+```
+
+Secret keys do not expose binary I/O — persist
+[`KeygenSeeds`](#deterministic-key-generation-from-seeds) instead.
+
+### Serialize / deserialize a ciphertext
+
+Ciphertexts are the wire format for sending encrypted values between parties.
+The blob records the plaintext bit width and GLWE layout, so mismatched
+parameters or a wrong `T` are rejected before any ciphertext bytes are read.
+
+```rust
+use squid::{Ciphertext, Context, Params};
+
+let mut ctx = Context::new(Params::unsecure());
+let (sk, _ek) = ctx.keygen();
+
+let ct = ctx.encrypt::<u32>(42, &sk);
+let blob: Vec<u8> = ctx.serialize_ciphertext(&ct).unwrap();
+
+// Reload with the same T and the same Params.
+let ct: Ciphertext<u32> = ctx.deserialize_ciphertext(&blob).unwrap();
+assert_eq!(ctx.decrypt::<u32>(&ct, &sk), 42);
+```
+
+### Deterministic key generation from seeds
+
+Poulpy does not expose a stable wire format for secret keys. To reproduce the
+same `(SecretKey, EvaluationKey)` pair across runs or machines, persist the
+three 32-byte ChaCha8 seeds returned by `keygen_with_seeds` and rebuild with
+`keygen_from_seeds`. Same `Params`, same backend, same keys.
+
+```rust
+use squid::{Context, KeygenSeeds, Params};
+
+let mut ctx = Context::new(Params::unsecure());
+
+// OS-random seeds (kept so we can replay keygen).
+let (sk, ek, seeds) = ctx.keygen_with_seeds();
+
+// Persist the seeds at the app level — `KeygenSeeds` redacts its Debug output.
+let KeygenSeeds { lattice, bdd_mask, bdd_noise } = seeds;
+// std::fs::write("seeds.bin", [lattice, bdd_mask, bdd_noise].concat()).unwrap();
+
+// Later: regenerate the same keys deterministically.
+let mut ctx = Context::new(Params::unsecure());
+let (sk2, ek2) = ctx.keygen_from_seeds(seeds);
+
+// If you only need encrypt/decrypt (no homomorphic ops), the lattice seed alone
+// is enough to rebuild the SecretKey — no EvaluationKey produced.
+let sk_only = ctx.secret_key_from_lattice_seed(seeds.lattice);
+```
+
+Treat the seeds as secret: anyone holding them can reconstruct `sk`.
 
 ## Operations
 
