@@ -518,7 +518,7 @@ dependencies = [
 [[package]]
 name = "poulpy-core"
 version = "0.5.0"
-source = "git+https://github.com/poulpy-fhe/poulpy.git?rev=b598566cef299a20ac9b159eef61aeadbf66f968#b598566cef299a20ac9b159eef61aeadbf66f968"
+source = "git+https://github.com/poulpy-fhe/poulpy.git?rev=067fd785a1d9087f7d9fa437a8503a2d74ac737f#067fd785a1d9087f7d9fa437a8503a2d74ac737f"
 dependencies = [
  "anyhow",
  "bytemuck",
@@ -535,7 +535,7 @@ dependencies = [
 [[package]]
 name = "poulpy-cpu-avx"
 version = "0.5.0"
-source = "git+https://github.com/poulpy-fhe/poulpy.git?rev=b598566cef299a20ac9b159eef61aeadbf66f968#b598566cef299a20ac9b159eef61aeadbf66f968"
+source = "git+https://github.com/poulpy-fhe/poulpy.git?rev=067fd785a1d9087f7d9fa437a8503a2d74ac737f#067fd785a1d9087f7d9fa437a8503a2d74ac737f"
 dependencies = [
  "bytemuck",
  "byteorder",
@@ -554,7 +554,7 @@ dependencies = [
 [[package]]
 name = "poulpy-cpu-ref"
 version = "0.5.0"
-source = "git+https://github.com/poulpy-fhe/poulpy.git?rev=b598566cef299a20ac9b159eef61aeadbf66f968#b598566cef299a20ac9b159eef61aeadbf66f968"
+source = "git+https://github.com/poulpy-fhe/poulpy.git?rev=067fd785a1d9087f7d9fa437a8503a2d74ac737f#067fd785a1d9087f7d9fa437a8503a2d74ac737f"
 dependencies = [
  "bytemuck",
  "byteorder",
@@ -573,7 +573,7 @@ dependencies = [
 [[package]]
 name = "poulpy-hal"
 version = "0.5.0"
-source = "git+https://github.com/poulpy-fhe/poulpy.git?rev=b598566cef299a20ac9b159eef61aeadbf66f968#b598566cef299a20ac9b159eef61aeadbf66f968"
+source = "git+https://github.com/poulpy-fhe/poulpy.git?rev=067fd785a1d9087f7d9fa437a8503a2d74ac737f#067fd785a1d9087f7d9fa437a8503a2d74ac737f"
 dependencies = [
  "anyhow",
  "bytemuck",
@@ -593,7 +593,7 @@ dependencies = [
 [[package]]
 name = "poulpy-schemes"
 version = "0.5.0"
-source = "git+https://github.com/poulpy-fhe/poulpy.git?rev=b598566cef299a20ac9b159eef61aeadbf66f968#b598566cef299a20ac9b159eef61aeadbf66f968"
+source = "git+https://github.com/poulpy-fhe/poulpy.git?rev=067fd785a1d9087f7d9fa437a8503a2d74ac737f#067fd785a1d9087f7d9fa437a8503a2d74ac737f"
 dependencies = [
  "anyhow",
  "byteorder",
