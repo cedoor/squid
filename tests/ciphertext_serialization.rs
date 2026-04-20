@@ -1,9 +1,13 @@
+mod common;
+
 use squid::{Ciphertext, Context, Params};
+
+use common::TEST_SEEDS;
 
 #[test]
 fn ciphertext_serialize_roundtrip_decrypts() {
     let mut ctx = Context::new(Params::test());
-    let (sk, _ek) = ctx.keygen();
+    let (sk, _ek) = ctx.keygen_from_seeds(TEST_SEEDS);
 
     let ct = ctx.encrypt::<u32>(0xdead_beef, &sk);
     let blob = ct.serialize().expect("serialize ciphertext");
@@ -15,7 +19,7 @@ fn ciphertext_serialize_roundtrip_decrypts() {
 #[test]
 fn ciphertext_wrong_type_parameter_is_rejected() {
     let mut ctx = Context::new(Params::test());
-    let (sk, _ek) = ctx.keygen();
+    let (sk, _ek) = ctx.keygen_from_seeds(TEST_SEEDS);
 
     let ct = ctx.encrypt::<u32>(1, &sk);
     let blob = ct.serialize().expect("serialize");
@@ -30,7 +34,7 @@ fn ciphertext_wrong_type_parameter_is_rejected() {
 fn ciphertext_rejects_mismatched_params_glwe_layout() {
     let mut ctx_encrypt = Context::new(Params::test());
     let mut ctx_other = Context::new(Params::unsecure());
-    let (sk, _ek) = ctx_encrypt.keygen();
+    let (sk, _ek) = ctx_encrypt.keygen_from_seeds(TEST_SEEDS);
 
     let ct = ctx_encrypt.encrypt::<u32>(1, &sk);
     let blob = ct.serialize().expect("serialize");
