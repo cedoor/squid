@@ -20,8 +20,8 @@ fn main() {
     let b: u32 = 30;
 
     println!("Encrypting {a} and {b}...");
-    let ct_a = ctx.encrypt::<u32>(a, &sk, &ek);
-    let ct_b = ctx.encrypt::<u32>(b, &sk, &ek);
+    let ct_a = ctx.encrypt::<u32>(a, &sk);
+    let ct_b = ctx.encrypt::<u32>(b, &sk);
 
     println!("Computing homomorphic addition...");
     let ct_c = ctx.add(&ct_a, &ct_b, &ek);

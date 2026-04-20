@@ -9,12 +9,12 @@ license = "MIT"
 backend-avx = ["dep:poulpy-cpu-avx"]
 
 [dependencies]
-poulpy-core = { git = "https://github.com/poulpy-fhe/poulpy.git", rev = "b598566cef299a20ac9b159eef61aeadbf66f968" }
-poulpy-schemes = { git = "https://github.com/poulpy-fhe/poulpy.git", rev = "b598566cef299a20ac9b159eef61aeadbf66f968" }
-poulpy-hal = { git = "https://github.com/poulpy-fhe/poulpy.git", rev = "b598566cef299a20ac9b159eef61aeadbf66f968" }
-poulpy-cpu-ref = { git = "https://github.com/poulpy-fhe/poulpy.git", rev = "b598566cef299a20ac9b159eef61aeadbf66f968" }
-poulpy-cpu-avx = { git = "https://github.com/poulpy-fhe/poulpy.git", rev = "b598566cef299a20ac9b159eef61aeadbf66f968", optional = true }
+poulpy-core = { git = "https://github.com/poulpy-fhe/poulpy.git", rev = "067fd785a1d9087f7d9fa437a8503a2d74ac737f" }
+poulpy-schemes = { git = "https://github.com/poulpy-fhe/poulpy.git", rev = "067fd785a1d9087f7d9fa437a8503a2d74ac737f" }
+poulpy-hal = { git = "https://github.com/poulpy-fhe/poulpy.git", rev = "067fd785a1d9087f7d9fa437a8503a2d74ac737f" }
+poulpy-cpu-ref = { git = "https://github.com/poulpy-fhe/poulpy.git", rev = "067fd785a1d9087f7d9fa437a8503a2d74ac737f" }
+poulpy-cpu-avx = { git = "https://github.com/poulpy-fhe/poulpy.git", rev = "067fd785a1d9087f7d9fa437a8503a2d74ac737f", optional = true }
 getrandom = "0.3"
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
-poulpy-cpu-avx = { git = "https://github.com/poulpy-fhe/poulpy.git", rev = "b598566cef299a20ac9b159eef61aeadbf66f968", optional = true, features = ["enable-avx"] }
+poulpy-cpu-avx = { git = "https://github.com/poulpy-fhe/poulpy.git", rev = "067fd785a1d9087f7d9fa437a8503a2d74ac737f", optional = true, features = ["enable-avx"] }

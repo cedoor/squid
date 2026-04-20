@@ -11,8 +11,8 @@
 //! let mut ctx = Context::new(Params::unsecure()).with_options(ContextOptions::default());
 //! let (sk, ek) = ctx.keygen();
 //!
-//! let a = ctx.encrypt::<u32>(42, &sk, &ek);
-//! let b = ctx.encrypt::<u32>(7, &sk, &ek);
+//! let a = ctx.encrypt::<u32>(42, &sk);
+//! let b = ctx.encrypt::<u32>(7, &sk);
 //! let c = ctx.add(&a, &b, &ek);
 //! let result: u32 = ctx.decrypt(&c, &sk);
 //! ```
@@ -35,8 +35,8 @@ use poulpy_hal::{
 use poulpy_schemes::bin_fhe::{
     bdd_arithmetic::{
         Add, And, BDDEncryptionInfos, BDDKey, BDDKeyEncryptSk, BDDKeyLayout, BDDKeyPrepared,
-        BDDKeyPreparedFactory, FheUint, FheUintPrepared, FromBits, Or, Sll, Slt, Sltu, Sra, Srl,
-        Sub, ToBits, UnsignedInteger, Xor,
+        BDDKeyPreparedFactory, FheUint, FheUintPrepare, FheUintPrepared, FromBits, Or, Sll, Slt,
+        Sltu, Sra, Srl, Sub, ToBits, UnsignedInteger, Xor,
     },
     blind_rotation::{BlindRotationKeyLayout, CGGI},
     circuit_bootstrapping::CircuitBootstrappingKeyLayout,
@@ -626,79 +626,44 @@ impl Context {
                 "trailing bytes in ciphertext blob",
             ));
         }
-        Ok(Ciphertext {
-            inner: fhe_uint,
-            prepared: None,
-        })
+        Ok(Ciphertext { inner: fhe_uint })
     }
 
     // ── Encrypt / Decrypt ────────────────────────────────────────────────────
 
     /// Encrypt a plaintext value under the given secret key.
     ///
-    /// Internally encrypts directly to the prepared (DFT-domain) form via
-    /// `FheUintPrepared::encrypt_sk`, then packs to a standard `FheUint` via
-    /// `from_fhe_uint_prepared` (which is why an [`EvaluationKey`] is required).
-    /// This matches the path validated by Poulpy's `test_bdd_add` and avoids the
-    /// `FheUint::encrypt_sk -> FheUintPrepared::prepare` pipeline, which is
-    /// currently broken upstream (`b598566`).
-    ///
-    /// The cached prepared form is consumed by homomorphic ops; the packed
-    /// inner form is used for [`Context::decrypt`] and serialization.
+    /// Packs the bits of `value` into a single standard-form GLWE ciphertext
+    /// via `FheUint::encrypt_sk`.  The DFT-domain prepared form is rebuilt
+    /// on demand inside [`Context::eval_binary`] when the value is used as an
+    /// operand.
     ///
     /// `T` must be one of `u8`, `u16`, `u32`, `u64`, `u128`.  Note that
     /// homomorphic arithmetic operations are currently only implemented for
     /// `u32` (the only type with compiled BDD circuits in `poulpy-schemes`).
-    pub fn encrypt<T>(&mut self, value: T, sk: &SecretKey, ek: &EvaluationKey) -> Ciphertext<T>
+    pub fn encrypt<T>(&mut self, value: T, sk: &SecretKey) -> Ciphertext<T>
     where
-        T: UnsignedInteger + ToBits + FromBits,
+        T: UnsignedInteger + ToBits,
     {
         let mut source_xa = random_source();
         let mut source_xe = random_source();
-        let ggsw_enc_infos = EncryptionLayout::new_from_default_sigma(self.params.ggsw_layout)
-            .expect("default GGSW encryption sigma");
+        let glwe_enc_infos = EncryptionLayout::new_from_default_sigma(self.params.glwe_layout)
+            .expect("default GLWE encryption sigma");
 
-        // TODO(poulpy-bug): switch to dynamic sizing once poulpy fixes the
-        // upstream `FheUint::encrypt_sk -> FheUintPrepared::prepare` bug
-        // (see `crate::ciphertext` module docs).  Once fixed, encrypt should
-        // route through that path and use `FheUint::encrypt_sk_tmp_bytes` +
-        // `Module::fhe_uint_prepare_tmp_bytes` for exact scratch sizing.
-        //
-        // Until then we work around the bug via `FheUintPrepared::encrypt_sk`
-        // followed by `FheUint::from_fhe_uint_prepared`.  Poulpy exposes no
-        // wrapper-level `*_tmp_bytes` helpers for either, and hand-composing
-        // from primitives is fragile (both wrappers call into deeper helpers
-        // like `glwe_pack -> glwe_trace` whose runtime scratch checks don't
-        // match a naive sum of public `_tmp_bytes`).  Poulpy's own
-        // `bdd_arithmetic` example/tests use a single 4 MiB arena for the
-        // whole pipeline; we do the same here for these two sequential ops.
-        const ENCRYPT_SCRATCH_BYTES: usize = 1 << 22;
-        let mut scratch_arena = scratch::new_arena(ENCRYPT_SCRATCH_BYTES);
-
-        let mut prepared: FheUintPrepared<DeviceBuf<crate::backend::BE>, T, crate::backend::BE> =
-            FheUintPrepared::alloc_from_infos(&self.module, &self.params.ggsw_layout);
-        prepared.encrypt_sk(
+        let mut fhe_uint: FheUint<Vec<u8>, T> = FheUint::alloc_from_infos(&self.params.glwe_layout);
+        let enc_bytes = fhe_uint.encrypt_sk_tmp_bytes(&self.module);
+        let mut scratch_e = scratch::new_arena(enc_bytes);
+        fhe_uint.encrypt_sk(
             &self.module,
             value,
             &sk.sk_glwe_prepared,
-            &ggsw_enc_infos,
+            &glwe_enc_infos,
             &mut source_xe,
             &mut source_xa,
-            scratch::borrow(&mut scratch_arena),
+            scratch::borrow(&mut scratch_e),
         );
 
-        let mut packed: FheUint<Vec<u8>, T> = FheUint::alloc_from_infos(&self.params.glwe_layout);
-        packed.from_fhe_uint_prepared(
-            &self.module,
-            &prepared,
-            &ek.bdd_key_prepared,
-            scratch::borrow(&mut scratch_arena),
-        );
-
-        Ciphertext {
-            inner: packed,
-            prepared: Some(prepared),
-        }
+        Ciphertext { inner: fhe_uint }
     }
 
     /// Decrypt a ciphertext and return the plaintext value.
@@ -717,12 +682,10 @@ impl Context {
 
     // ── Internal helper ───────────────────────────────────────────────────────
 
-    /// Run a binary op on the prepared form of `a` and `b`.
+    /// Prepare `a` and `b`, run `op`, and return the result.
     ///
-    /// Both inputs must carry their prepared cache (i.e. come straight from
-    /// [`Context::encrypt`]). Op outputs and deserialized ciphertexts have
-    /// no cache and panic with a clear message — see the [`crate::ciphertext`]
-    /// module docs for the upstream limitation.
+    /// Builds a fresh `FheUintPrepared` for each input on every call, then invokes `op` with both prepared operands and a
+    /// scratch region sized to whichever of prepare / op is larger.
     fn eval_binary<T, F>(
         &mut self,
         a: &Ciphertext<T>,
@@ -743,27 +706,44 @@ impl Context {
             &mut poulpy_hal::layouts::Scratch<crate::backend::BE>,
         ),
     {
-        const NO_PREPARED_CACHE: &str =
-            "ciphertext lacks prepared cache; only freshly encrypted ciphertexts can be operated \
-             on in this Poulpy revision (see ciphertext module docs)";
-        let a_prep = a.prepared.as_ref().expect(NO_PREPARED_CACHE);
-        let b_prep = b.prepared.as_ref().expect(NO_PREPARED_CACHE);
+        let mut a_prep: FheUintPrepared<DeviceBuf<crate::backend::BE>, T, crate::backend::BE> =
+            FheUintPrepared::alloc_from_infos(&self.module, &self.params.ggsw_layout);
+        let mut b_prep: FheUintPrepared<DeviceBuf<crate::backend::BE>, T, crate::backend::BE> =
+            FheUintPrepared::alloc_from_infos(&self.module, &self.params.ggsw_layout);
+
+        let prepare_bytes = self.module.fhe_uint_prepare_tmp_bytes(
+            self.params.binary_block_size as usize,
+            1,
+            &self.params.ggsw_layout,
+            &self.params.glwe_layout,
+            &ek.bdd_key_prepared,
+        );
+        let mut scratch_arena = scratch::new_arena(prepare_bytes.max(eval_scratch_bytes));
+
+        a_prep.prepare::<CGGI, _, _, _, _>(
+            &self.module,
+            &a.inner,
+            &ek.bdd_key_prepared,
+            scratch::borrow(&mut scratch_arena),
+        );
+        b_prep.prepare::<CGGI, _, _, _, _>(
+            &self.module,
+            &b.inner,
+            &ek.bdd_key_prepared,
+            scratch::borrow(&mut scratch_arena),
+        );
 
         let mut out: FheUint<Vec<u8>, T> = FheUint::alloc_from_infos(&self.params.glwe_layout);
-        let mut scratch_eval = scratch::new_arena(eval_scratch_bytes);
         op(
             &self.module,
             self.options.eval_threads,
             &mut out,
-            a_prep,
-            b_prep,
+            &a_prep,
+            &b_prep,
             &ek.bdd_key_prepared,
-            scratch::borrow(&mut scratch_eval),
+            scratch::borrow(&mut scratch_arena),
         );
-        Ciphertext {
-            inner: out,
-            prepared: None,
-        }
+        Ciphertext { inner: out }
     }
 
     // ── Arithmetic and logical operations ────────────────────────────────────

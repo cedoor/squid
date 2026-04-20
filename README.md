@@ -1,7 +1,7 @@
 # 🦑 Squid
- 
+
 **An ergonomic Rust wrapper for [Poulpy](https://github.com/phantomzone-org/poulpy), making Fully Homomorphic Encryption accessible without sacrificing control.**
- 
+
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![CI](https://github.com/cedoor/squid/actions/workflows/ci.yml/badge.svg)](https://github.com/cedoor/squid/actions) ![Status](https://img.shields.io/badge/status-early%20development-orange)
 
 Poulpy is a low-level, modular toolkit exposing the full machinery of lattice-based homomorphic encryption. That power comes with sharp edges: manual scratch arenas, explicit lifecycle transitions, trait-heavy APIs. `squid` wraps Poulpy with a smaller, opinionated surface so you can write FHE programs without managing every byte of workspace memory or tracking which representation a ciphertext currently lives in.
@@ -21,8 +21,8 @@ fn main() {
     let (sk, ek) = ctx.keygen();
 
     // Encrypt two 32-bit integers
-    let a = ctx.encrypt::<u32>(255, &sk, &ek);
-    let b = ctx.encrypt::<u32>(30, &sk, &ek);
+    let a = ctx.encrypt::<u32>(255, &sk);
+    let b = ctx.encrypt::<u32>(30, &sk);
 
     // Homomorphic addition: computes (a + b) under encryption
     let c = ctx.add(&a, &b, &ek);
@@ -38,24 +38,24 @@ fn main() {
 
 All operations currently require `T = u32` (the only width with compiled BDD circuits in Poulpy). Encrypt and decrypt work for `u8`, `u16`, and `u32`.
 
-| Method | Description |
-|---|---|
-| `ctx.add(a, b, ek)` | Wrapping addition |
-| `ctx.sub(a, b, ek)` | Wrapping subtraction |
-| `ctx.and(a, b, ek)` | Bitwise AND |
-| `ctx.or(a, b, ek)` | Bitwise OR |
-| `ctx.xor(a, b, ek)` | Bitwise XOR |
-| `ctx.sll(a, b, ek)` | Logical left shift |
-| `ctx.srl(a, b, ek)` | Logical right shift |
-| `ctx.sra(a, b, ek)` | Arithmetic right shift |
-| `ctx.slt(a, b, ek)` | Signed less-than |
-| `ctx.sltu(a, b, ek)` | Unsigned less-than |
+| Method               | Description            |
+| -------------------- | ---------------------- |
+| `ctx.add(a, b, ek)`  | Wrapping addition      |
+| `ctx.sub(a, b, ek)`  | Wrapping subtraction   |
+| `ctx.and(a, b, ek)`  | Bitwise AND            |
+| `ctx.or(a, b, ek)`   | Bitwise OR             |
+| `ctx.xor(a, b, ek)`  | Bitwise XOR            |
+| `ctx.sll(a, b, ek)`  | Logical left shift     |
+| `ctx.srl(a, b, ek)`  | Logical right shift    |
+| `ctx.sra(a, b, ek)`  | Arithmetic right shift |
+| `ctx.slt(a, b, ek)`  | Signed less-than       |
+| `ctx.sltu(a, b, ek)` | Unsigned less-than     |
 
 ## Backends
 
-| Feature       | Backend    | Notes                          |
-|---------------|------------|--------------------------------|
-| *(default)*   | `FFT64Ref` | Portable                       |
+| Feature       | Backend    | Notes                           |
+| ------------- | ---------- | ------------------------------- |
+| _(default)_   | `FFT64Ref` | Portable                        |
 | `backend-avx` | `FFT64Avx` | x86-64, AVX2+FMA (~3–5× vs ref) |
 
 ```sh
@@ -84,7 +84,7 @@ The public API is identical regardless of which backend is selected.
 - [ ] Identity / noise refresh: [#11](https://github.com/cedoor/squid/issues/11)
 - [ ] NTT backend: [#12](https://github.com/cedoor/squid/issues/12)
 - [x] Key serialization: [#13](https://github.com/cedoor/squid/issues/13)
-- [ ] Revert `encrypt` workaround once upstream poulpy bug is fixed: [#24](https://github.com/cedoor/squid/issues/24)
+- [x] Revert `encrypt` workaround once upstream poulpy bug is fixed: [#24](https://github.com/cedoor/squid/issues/24)
 
 ### Milestone 3 — Developer Experience & Optimization: [#3](https://github.com/cedoor/squid/milestone/3)
 
