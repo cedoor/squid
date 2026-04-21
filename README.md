@@ -8,6 +8,8 @@ Poulpy is a low-level, modular toolkit exposing the full machinery of lattice-ba
 
 **Current scope:** `squid` wraps Poulpy's `bin_fhe::bdd_arithmetic` layer: gate-level FHE on encrypted unsigned integers (`u8`, `u16`, `u32`). This is the only fully exposed end-to-end capability in `poulpy-schemes` today. The API will expand as Poulpy adds more scheme-level implementations.
 
+There are also [JavaScript bindings](https://github.com/cedoor/poulpy-js/) (browser and Node, via WebAssembly and napi-rs) built on Squid’s Rust API.
+
 ## Usage
 
 ### Quick start
@@ -170,7 +172,7 @@ The public API is identical regardless of which backend is selected.
 
 ### Milestone 3 — Developer Experience & Optimization: [#3](https://github.com/cedoor/squid/milestone/3)
 
-- [ ] WASM crate: [#14](https://github.com/cedoor/squid/issues/14)
+- [x] WASM crate: [#14](https://github.com/cedoor/squid/issues/14)
 - [ ] Params validation with clear error messages: [#15](https://github.com/cedoor/squid/issues/15)
 - [ ] Realistic examples: [#16](https://github.com/cedoor/squid/issues/16)
 - [ ] Benchmarks: [#17](https://github.com/cedoor/squid/issues/17)
