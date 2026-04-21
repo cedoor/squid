@@ -36,6 +36,10 @@ fn main() {
 }
 ```
 
+### Preset name (config / CLI)
+
+Built-in bundles can be selected by string: `Params::by_name("unsecure")` and `Params::by_name("test")` each return `Some(Params)`, and any other input returns `None`. Prefer `Params::unsecure()` / `Params::test()` when the choice is fixed in code.
+
 ### Serialize / deserialize an evaluation key
 
 The evaluation key is public material needed for every homomorphic op. Persist

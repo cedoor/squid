@@ -291,6 +291,23 @@ impl Params {
             bdd_layout,
         }
     }
+
+    /// Look up a built-in parameter set by name.
+    ///
+    /// Accepted names map to the constructors of the same name:
+    /// - `"unsecure"` → [`Params::unsecure`]
+    /// - `"test"`    → [`Params::test`]
+    ///
+    /// Returns `None` for any other input.  Intended for config- or CLI-driven
+    /// selection; prefer calling the constructors directly when the choice is
+    /// known at compile time.
+    pub fn by_name(name: &str) -> Option<Self> {
+        match name {
+            "unsecure" => Some(Self::unsecure()),
+            "test" => Some(Self::test()),
+            _ => None,
+        }
+    }
 }
 
 // ── Context ──────────────────────────────────────────────────────────────────
