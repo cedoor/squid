@@ -1,16 +1,29 @@
 # 🦑 Squid
 
-**An ergonomic Rust wrapper for [Poulpy](https://github.com/phantomzone-org/poulpy), making Fully Homomorphic Encryption accessible without sacrificing control.**
+**An ergonomic Rust wrapper ([`squid`](crates/squid)) for [Poulpy](https://github.com/poulpy-fhe/poulpy) and the [`squid-js`](packages/squid-js) library for browser and Node (WebAssembly + napi-rs), making Fully Homomorphic Encryption accessible without sacrificing control.**
 
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![CI](https://github.com/cedoor/squid/actions/workflows/ci.yml/badge.svg)](https://github.com/cedoor/squid/actions) ![Status](https://img.shields.io/badge/status-early%20development-orange)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![CI](https://github.com/cedoor/squid/actions/workflows/ci.yml/badge.svg)](https://github.com/cedoor/squid/actions) [![Live demo](https://img.shields.io/badge/demo-squid.cedoor.dev-blueviolet)](https://squid.cedoor.dev/) ![Status](https://img.shields.io/badge/status-early%20development-orange)
 
-Poulpy is a low-level, modular toolkit exposing the full machinery of lattice-based homomorphic encryption. That power comes with sharp edges: manual scratch arenas, explicit lifecycle transitions, trait-heavy APIs. `squid` wraps Poulpy with a smaller, opinionated surface so you can write FHE programs without managing every byte of workspace memory or tracking which representation a ciphertext currently lives in.
+Poulpy is a low-level, modular toolkit exposing the full machinery of lattice-based homomorphic encryption. That power comes with sharp edges: manual scratch arenas, explicit lifecycle transitions, trait-heavy APIs. [`squid`](crates/squid) wraps Poulpy with a smaller, opinionated surface so you can write FHE programs without managing every byte of workspace memory or tracking which representation a ciphertext currently lives in.
 
-**Current scope:** `squid` wraps Poulpy's `bin_fhe::bdd_arithmetic` layer: gate-level FHE on encrypted unsigned integers (`u8`, `u16`, `u32`). This is the only fully exposed end-to-end capability in `poulpy-schemes` today. The API will expand as Poulpy adds more scheme-level implementations.
+For JavaScript and TypeScript, **[`squid-js`](packages/squid-js)** exposes the same stack: **`squid-js/client`** runs keygen, encrypt, and decrypt in the browser over WebAssembly (typically inside a dedicated worker so crypto stays off the UI thread), while **`squid-js/server`** runs homomorphic evaluation in Node via a native addon (napi-rs). In the usual setup the secret key stays on the client; the server only receives the evaluation key and ciphertexts.
 
-There are also [JavaScript bindings](https://github.com/cedoor/poulpy-js/) (browser and Node, via WebAssembly and napi-rs) built on Squid’s Rust API.
+**Current scope:** [`squid`](crates/squid) wraps Poulpy's `bin_fhe::bdd_arithmetic` layer: gate-level FHE on encrypted unsigned integers (`u8`, `u16`, `u32`). This is the only fully exposed end-to-end capability in `poulpy-schemes` today. The API will expand as Poulpy adds more scheme-level implementations.
 
-## Usage
+## Monorepo structure
+
+| Path                                     | Description                                                      |
+| ---------------------------------------- | ---------------------------------------------------------------- |
+| [`crates/squid`](crates/squid)           | Rust library — ergonomic Poulpy wrapper (this is the main crate) |
+| [`crates/squid-wasm`](crates/squid-wasm) | WebAssembly bindings via `wasm-bindgen` (browser)                |
+| [`crates/squid-napi`](crates/squid-napi) | Node.js native bindings via `napi-rs` (server)                   |
+| [`packages/squid-js`](packages/squid-js) | npm package — browser client + Node evaluator                    |
+| [`demo`](demo)                           | Next.js demo: keygen in browser, homomorphic eval on server — **[live at squid.cedoor.dev](https://squid.cedoor.dev/)** |
+| [`tests`](tests)                         | Playwright end-to-end tests for the demo                         |
+
+The Cargo workspace ties the three Rust crates together. The pnpm workspace ties [`squid-js`](packages/squid-js), the demo, and the E2E tests together.
+
+## Usage (Rust)
 
 ### Quick start
 
@@ -46,7 +59,7 @@ Built-in bundles can be selected by string: `Params::by_name("unsecure")` and `P
 
 The evaluation key is public material needed for every homomorphic op. Persist
 it once and reload it on the server that runs the circuits. The blob is
-versioned and tied to the [`Params`](src/context.rs) used at keygen — loading
+versioned and tied to the [`Params`](crates/squid/src/context.rs) used at keygen — loading
 under different parameters returns an `io::Error`.
 
 ```rust
@@ -179,12 +192,12 @@ The public API is identical regardless of which backend is selected.
 - [ ] Vetted Params presets: [#18](https://github.com/cedoor/squid/issues/18)
 - [ ] Refactor `context.rs`: [#20](https://github.com/cedoor/squid/issues/20)
 - [ ] Add CHANGELOG file: [#26](https://github.com/cedoor/squid/issues/26)
-- [x] [#22](https://github.com/cedoor/squid/issues/22) — closed: `Context` no longer keeps a persistent max-sized arena; scratch is allocated per operation from Poulpy’s `*_tmp_bytes` (supersedes the issue’s “split keygen vs runtime” split).
+- [x] [#22](https://github.com/cedoor/squid/issues/22) — closed: `Context` no longer keeps a persistent max-sized arena; scratch is allocated per operation from Poulpy's `*_tmp_bytes` (supersedes the issue's "split keygen vs runtime" split).
 
 ## Design goals
 
 - **Hide scratch management.** Callers never allocate or thread scratch buffers.
 - **Hide lifecycle transitions.** The Standard → Prepared → BDD-eval pipeline is handled internally; users see one coherent `Ciphertext<T>` type.
 - **Explicitly non-production defaults.** `Params::unsecure()` matches Poulpy's `bdd_arithmetic` example for demos; treat it as unaudited unless you analyse parameters yourself.
-- **No magic.** Every abstraction is traceable to the underlying Poulpy call. No hidden global state; scratch is sized with Poulpy’s `*_tmp_bytes` at each operation.
+- **No magic.** Every abstraction is traceable to the underlying Poulpy call. No hidden global state; scratch is sized with Poulpy's `*_tmp_bytes` at each operation.
 - **Safe defaults.** Every user-facing choice has a default that works without configuration. Alternatives are documented with their trade-offs and the conditions under which they should be preferred.

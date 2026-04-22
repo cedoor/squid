@@ -1,6 +1,6 @@
 ---
 description: Key Poulpy concepts required before modifying squid code
-globs: src/**/*.rs
+globs: crates/squid/src/**/*.rs
 alwaysApply: false
 ---
 
@@ -16,11 +16,11 @@ Poulpy operations never heap-allocate on the hot path. Every operation accepts `
 
 Every ciphertext and key lives in one of three representations:
 
-| Layer | Storage | Use |
-|---|---|---|
-| Standard | `Vec<u8>`, serializable | Encrypt, decrypt, store, send |
-| Compressed | seed + body only | Reduced-size storage |
-| Prepared | DFT/NTT domain, backend-specific | Fast multiplication, key-switching |
+| Layer      | Storage                          | Use                                |
+| ---------- | -------------------------------- | ---------------------------------- |
+| Standard   | `Vec<u8>`, serializable          | Encrypt, decrypt, store, send      |
+| Compressed | seed + body only                 | Reduced-size storage               |
+| Prepared   | DFT/NTT domain, backend-specific | Fast multiplication, key-switching |
 
 squid hides this: users always hold Standard forms. Prepared forms are created transiently inside `Context` operations and never surface in the public API.
 
@@ -41,6 +41,7 @@ All arithmetic is expressed as trait methods on `Module<BE>`. The backend `BE` i
 ## 5. BDD key hierarchy
 
 `BDDKey` bundles three sub-keys:
+
 - `CircuitBootstrappingKey` — blind rotation key + automorphism key + tensor switching key
 - `GLWESwitchingKey` (optional) — rank reduction before LWE extraction
 - `GLWEToLWESwitchingKey` — GLWE -> LWE extraction

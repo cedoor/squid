@@ -1,0 +1,15 @@
+{
+  "name": "@squid-js/e2e",
+  "version": "0.1.0",
+  "private": true,
+  "description": "End-to-end tests for the squid-js client/server demo.",
+  "type": "module",
+  "scripts": {
+    "pretest": "playwright install chromium",
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.48.0",
+    "@types/node": "^22.7.5"
+  }
+}

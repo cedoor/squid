@@ -7,3 +7,29 @@
 
 # macOS
 .DS_Store
+
+# Node
+node_modules/
+dist/
+pkg/
+*.node
+packages/squid-js/wasm/
+packages/squid-js/napi/
+
+# Next.js
+demo/.next/
+demo/data/*.bin
+
+# Playwright
+tests/playwright-report/
+tests/test-results/
+
+# Environment
+.env
+.env.local
+*.log
+*.tsbuildinfo
+
+# pnpm
+.pnpm-store/
+pnpm-debug.log*
