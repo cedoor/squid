@@ -1,22 +1,24 @@
 ---
 description: Module responsibilities and boundaries for squid
-globs: src/**/*.rs
+globs: crates/squid/src/**/*.rs
 alwaysApply: false
 ---
 
 # Module responsibilities
 
-| Module | File | Responsibility |
-|---|---|---|
-| `context` | `src/context.rs` | Single user entry point. Owns `Module<BE>` and `Params`. Allocates `scratch::Arena` per operation using Poulpy `*_tmp_bytes`. All public API flows through `Context`. |
-| `backend` | `src/backend.rs` | Compile-time `BE` alias (`FFT64Ref` or `FFT64Avx` via `backend-avx`). `pub(crate)` only; not re-exported from `lib.rs`. |
-| `scratch` | `src/scratch.rs` | Scratch arena (`Arena`): `new_arena` and `borrow` over `ScratchOwned<BE>`. `Context` sizes each allocation from Poulpy `*_tmp_bytes` at call sites. `pub(crate)`; not part of the supported public API. |
-| `keys` | `src/keys.rs` | `SecretKey` and `EvaluationKey` types. Holds standard-form and prepared-form key material. Hides all lifecycle transitions. |
-| `ciphertext` | `src/ciphertext.rs` | `Ciphertext<T>` newtype over `FheUint<Vec<u8>, T>`. The only ciphertext form users ever see. |
+Rust sources live under `crates/squid/src/`.
+
+| Module       | File                             | Responsibility                                                                                                                                                                                          |
+| ------------ | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `context`    | `crates/squid/src/context.rs`    | Single user entry point. Owns `Module<BE>` and `Params`. Allocates `scratch::Arena` per operation using Poulpy `*_tmp_bytes`. All public API flows through `Context`.                                   |
+| `backend`    | `crates/squid/src/backend.rs`    | Compile-time `BE` alias (`FFT64Ref` or `FFT64Avx` via `backend-avx`). `pub(crate)` only; not re-exported from `lib.rs`.                                                                                 |
+| `scratch`    | `crates/squid/src/scratch.rs`    | Scratch arena (`Arena`): `new_arena` and `borrow` over `ScratchOwned<BE>`. `Context` sizes each allocation from Poulpy `*_tmp_bytes` at call sites. `pub(crate)`; not part of the supported public API. |
+| `keys`       | `crates/squid/src/keys.rs`       | `SecretKey` and `EvaluationKey` types. Holds standard-form and prepared-form key material. Hides all lifecycle transitions.                                                                             |
+| `ciphertext` | `crates/squid/src/ciphertext.rs` | `Ciphertext<T>` newtype over `FheUint<Vec<u8>, T>`. The only ciphertext form users ever see.                                                                                                            |
 
 ## lib.rs
 
-`lib.rs` is module declarations and `pub use` re-exports only. No logic. Declares `pub mod` for `context`, `scratch`, `keys`, and `ciphertext`, and a private `mod backend`.
+`crates/squid/src/lib.rs` is module declarations and `pub use` re-exports only. No logic. Declares `pub mod` for `context`, `scratch`, `keys`, and `ciphertext`, and a private `mod backend`.
 
 ## Ownership model
 

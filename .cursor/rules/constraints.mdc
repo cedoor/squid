@@ -5,6 +5,8 @@ alwaysApply: true
 
 # Constraints
 
+These rules apply to the Rust `squid` library in `crates/squid` (and its wasm/napi shims must stay thin).
+
 ## Never re-implement Poulpy internals
 
 If a primitive exists in `poulpy-core`, `poulpy-schemes`, `poulpy-hal`, or `poulpy-cpu-ref`, use it. Writing a "simpler" version in squid defeats the purpose and will drift from Poulpy's correctness guarantees.

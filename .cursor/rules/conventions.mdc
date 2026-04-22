@@ -1,20 +1,22 @@
 ---
 description: Coding conventions for squid
-globs: src/**/*.rs, examples/**/*.rs
+globs: crates/squid/src/**/*.rs, crates/squid/examples/**/*.rs
 alwaysApply: false
 ---
 
 # Coding conventions
 
+Paths below are under `crates/squid/`.
+
 ## Structure
 
-- `lib.rs` is module declarations and `pub use` re-exports only. No logic ever goes there.
+- `src/lib.rs` is module declarations and `pub use` re-exports only. No logic ever goes there.
 - All public operations are methods on `Context`. If a user needs to import a type from `keys` or `ciphertext` directly, re-export it from `lib.rs` instead.
 - `scratch` is a `pub mod`, but every item in `scratch.rs` is `pub(crate)` — treat it as internal; it is not re-exported from `lib.rs` and is not part of the supported API.
 
 ## Types
 
-- The backend is selected at compile time via `crate::backend::BE` (see `src/backend.rs`). `type Mod = Module<crate::backend::BE>` in `context.rs`. Do not add `<BE: Backend>` generics to any public type. Use `crate::backend::BE` everywhere internally instead of hard-coding `FFT64Ref`.
+- The backend is selected at compile time via `crate::backend::BE` (see `src/backend.rs` in `crates/squid`). `type Mod = Module<crate::backend::BE>` in `context.rs`. Do not add `<BE: Backend>` generics to any public type. Use `crate::backend::BE` everywhere internally instead of hard-coding `FFT64Ref`.
 - Layout fields on `Params` and its nested structs use Poulpy newtypes (`Degree`, `Base2K`, etc.). Prefer `Params::unsecure()` for the Poulpy `bdd_arithmetic` example bundle (not a security claim). For a custom `Params`, keep all layouts self-consistent (same `n_glwe`, `base2k`, `rank`, … across `glwe_layout`, `ggsw_layout`, `bdd_layout`).
 - `Ciphertext<T>` is always in standard (`Vec<u8>`) form. `FheUintPrepared` must never escape `eval_binary`.
 
@@ -29,6 +31,7 @@ Stay close to Poulpy's vocabulary when naming wrapper types so users who read Po
 ## User-facing choices
 
 Every feature that gives the end user a choice must have a sensible default that works without configuration. Alternatives (e.g. feature flags, optional parameters, variant constructors) must be documented with:
+
 - what the alternative does differently from the default
 - when the user should prefer it over the default
 - any trade-offs or requirements (e.g. hardware, security implications, performance cost)

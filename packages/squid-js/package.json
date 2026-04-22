@@ -1,0 +1,47 @@
+{
+  "name": "squid-js",
+  "version": "0.1.2",
+  "description": "Browser FHE client and Node evaluator over Squid. `squid-js/client` uses wasm; `squid-js/server` uses a napi-rs native addon.",
+  "type": "module",
+  "exports": {
+    "./client": {
+      "types": "./dist/client.d.ts",
+      "import": "./dist/client.js"
+    },
+    "./server": {
+      "browser": "./dist/server-browser-stub.js",
+      "types": "./dist/server.d.ts",
+      "import": "./dist/server.js"
+    },
+    "./wasm/*": "./wasm/*"
+  },
+  "files": [
+    "dist",
+    "wasm",
+    "napi",
+    "src"
+  ],
+  "napi": {
+    "name": "squid",
+    "triples": {
+      "defaults": true
+    }
+  },
+  "scripts": {
+    "build:wasm": "wasm-pack build ../../crates/squid-wasm --target web --out-dir ../../packages/squid-js/wasm --out-name squid_wasm && node -e \"try { require('fs').unlinkSync('wasm/.gitignore'); } catch (e) { if (e.code !== 'ENOENT') throw e; }\"",
+    "build:napi": "napi build --cargo-cwd ../../crates/squid-napi --platform --release --js index.js --dts index.d.ts napi && node -e \"require('fs').writeFileSync('napi/package.json', '{\\\"type\\\":\\\"commonjs\\\"}\\n')\"",
+    "build:ts": "tsc -p tsconfig.json",
+    "build": "pnpm run build:wasm && pnpm run build:napi && pnpm run build:ts",
+    "build:squid:linux": "bash scripts/build-linux-napi.sh",
+    "prepublishOnly": "pnpm run build && pnpm run build:squid:linux",
+    "dev": "tsc -p tsconfig.json --watch"
+  },
+  "devDependencies": {
+    "@napi-rs/cli": "^2.18.4",
+    "@types/node": "^22.7.5",
+    "typescript": "^5.6.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

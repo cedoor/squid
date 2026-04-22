@@ -1,0 +1,28 @@
+[package]
+name = "squid-wasm"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "wasm-bindgen bindings for cedoor/squid (portable backend)."
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+squid = { workspace = true }
+wasm-bindgen = "0.2.95"
+js-sys = "0.3.72"
+console_error_panic_hook = "0.1.7"
+
+# On wasm32 we need getrandom's JS backend for every version that ends up
+# linked into the dep graph (squid uses 0.3, some transitive Poulpy deps pull
+# in 0.4). Cargo unifies features per-semver, so turning `wasm_js` on here is
+# enough to make every user of that major version compile.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom_03 = { package = "getrandom", version = "0.3", features = ["wasm_js"] }
+getrandom_04 = { package = "getrandom", version = "0.4", features = ["wasm_js"] }
+
+[features]
+default = []

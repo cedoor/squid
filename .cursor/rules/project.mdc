@@ -7,6 +7,21 @@ alwaysApply: true
 
 `squid` is an ergonomic Rust wrapper over [Poulpy](https://github.com/phantomzone-org/poulpy), a low-level, modular FHE toolkit. Poulpy exposes the full machinery of lattice-based homomorphic encryption and leaves resource management entirely to the caller. squid wraps it with a smaller, opinionated API.
 
+## Monorepo layout
+
+This repository is a **Cargo workspace** and a **pnpm workspace**:
+
+| Path                | Role                                                                  |
+| ------------------- | --------------------------------------------------------------------- |
+| `crates/squid`      | Rust library (package name `squid`); primary focus of the rules below |
+| `crates/squid-wasm` | `wasm-bindgen` crate for the browser                                  |
+| `crates/squid-napi` | napi-rs native addon for Node                                         |
+| `packages/squid-js` | TypeScript package: client (wasm), server (`.node`)                   |
+| `demo`              | Next.js walkthrough app (`@squid-js/demo`)                            |
+| `tests`             | Playwright e2e (`@squid-js/e2e`)                                      |
+
+Root scripts: `pnpm run build:squid-js`, `pnpm run build:demo`, `pnpm test`.
+
 ## Current scope
 
 squid currently wraps `poulpy-schemes::bin_fhe::bdd_arithmetic` only — the one fully exposed end-to-end capability in `poulpy-schemes`. That means:
@@ -23,10 +38,10 @@ The scope will expand as `poulpy-schemes` adds more scheme-level implementations
 
 Everything flows through `Context`. The user-facing types are:
 
-| Type | Role |
-|---|---|
-| `Context` | Owns `Module<BE>` and `Params`. Allocates Poulpy scratch per operation from `*_tmp_bytes` (not exposed). Entry point for all operations. |
-| `Params` | Layout parameter bundle. Use `Params::unsecure()` (demo / non-production) or construct custom. |
-| `SecretKey` | Private key material: standard GLWE + LWE secrets and prepared GLWE for encrypt/decrypt. Returned by `Context::keygen`. |
-| `EvaluationKey` | Public evaluation key bundle (`BDDKey` standard + prepared). Returned by `Context::keygen`. |
-| `Ciphertext<T>` | Encrypted `T` value (`u8`, `u16`, `u32`). All ops run through `Context`. |
+| Type            | Role                                                                                                                                     |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `Context`       | Owns `Module<BE>` and `Params`. Allocates Poulpy scratch per operation from `*_tmp_bytes` (not exposed). Entry point for all operations. |
+| `Params`        | Layout parameter bundle. Use `Params::unsecure()` (demo / non-production) or construct custom.                                           |
+| `SecretKey`     | Private key material: standard GLWE + LWE secrets and prepared GLWE for encrypt/decrypt. Returned by `Context::keygen`.                  |
+| `EvaluationKey` | Public evaluation key bundle (`BDDKey` standard + prepared). Returned by `Context::keygen`.                                              |
+| `Ciphertext<T>` | Encrypted `T` value (`u8`, `u16`, `u32`). All ops run through `Context`.                                                                 |
