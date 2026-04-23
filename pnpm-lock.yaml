@@ -21,7 +21,7 @@ importers:
   demo:
     dependencies:
       '@cedoor/squid':
-        specifier: workspace:*
+        specifier: 0.1.0
         version: link:../packages/squid-js
       next:
         specifier: ^15.3.1
