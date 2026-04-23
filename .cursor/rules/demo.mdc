@@ -1,0 +1,60 @@
+---
+description: Architecture and conventions for the demo Next.js app and Playwright e2e tests
+globs: demo/src/**/*.{ts,tsx}, demo/scripts/**/*.mjs, tests/**/*.ts
+alwaysApply: false
+---
+
+# demo + e2e
+
+`demo/` is a Next.js app that walks through a full client→server FHE addition. `tests/` is the Playwright e2e suite that exercises it end-to-end.
+
+## How the demo uses squid-js
+
+**Browser (client side):**
+`src/hooks/useFhe.ts` dynamically imports `@cedoor/squid/client` and drives all FHE state. It creates a `PoulpyClient` once and stores it in a `useRef` so it survives re-renders.
+
+**Server (Node.js):**
+`src/lib/load-demo-evaluator.ts` exports `getDemoEvaluator()`, which calls `Evaluator.load()` once and caches the result in a module-level variable. The singleton is safe because homomorphic operations are deterministic and stateless beyond the EK. Do not call `Evaluator.load()` inside request handlers — it deserialises a 30 MB binary on every call.
+
+**API route (`src/app/api/add/route.ts`):**
+Receives two ciphertexts packed together in one `Buffer`. Splitting is handled by `packCiphertexts()` in `src/lib/pack.ts`, which prepends a 4-byte little-endian length for `a` so the server knows where `a` ends and `b` begins. Follow this convention for any future routes that pass multiple ciphertexts.
+
+## Demo seed and evaluation key
+
+`src/lib/demo-seed.ts` exports `DEMO_KEY_SEED` — a fixed 96-byte seed. Both client and server derive their keys from this seed so the evaluation key matches without any transmission of secret material.
+
+`data/demo-ek.test.bin` is the pre-generated EK binary (≈30 MB) produced by `scripts/generate-demo-ek.mjs`. It is tied to `DEMO_KEY_SEED` and `paramsSet="test"`. Generation takes ~30 s; do it once and commit the result.
+
+`scripts/ensure-demo-ek.mjs` is run automatically as `predev` and `prebuild` — it checks whether the file exists and spawns the generator if not. Do not delete `data/demo-ek.test.bin` without re-running generation.
+
+Environment overrides:
+- `POULPY_PARAMS_SET` / `NEXT_PUBLIC_POULPY_PARAMS_SET` — params set name (must match on both sides)
+- `POULPY_DEMO_EK_PATH` — custom path to the EK binary
+
+## State machine (`useFhe`)
+
+The hook uses `useReducer`. Phases progress linearly: `idle → keygen → encrypting → sending → evaluating → decrypting`. Do not add side effects outside the reducer's dispatch flow — all transitions must go through it so the UI log and button states stay in sync.
+
+## Next.js configuration
+
+`next.config.ts` has three non-negotiable settings:
+
+1. **COOP/COEP headers** — required for Web Worker support in all browsers:
+   ```
+   Cross-Origin-Opener-Policy: same-origin
+   Cross-Origin-Embedder-Policy: require-corp
+   ```
+2. **`serverExternalPackages: ['@cedoor/squid']`** — prevents Next.js from bundling the NAPI module into SSR chunks, which would fail.
+3. **`experiments.asyncWebAssembly: true`** — enables async WASM imports in the browser bundle.
+
+Do not remove any of these; they are not optional optimisations.
+
+## e2e tests (`tests/`)
+
+Single Playwright test: keygen → encrypt → send → decrypt, checking the result is `12` (7 + 5). Important timeouts:
+- Keygen step: 30 s (`KEYGEN_TIMEOUT_MS`) — WASM keygen is slow
+- Homomorphic eval: 15 s (`COMPUTE_TIMEOUT_MS`)
+
+`playwright.config.ts` sets `reuseExistingServer: true` locally (run `pnpm dev` yourself, then `pnpm test`). In CI (`CI=1`) it launches the server automatically. Workers are set to 1 — do not parallelise because there is one shared demo server.
+
+Run all tests from the workspace root: `pnpm test`.

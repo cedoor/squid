@@ -9,3 +9,5 @@ Developer guide for AI assistants working in this repo. Detailed rules live in `
 | [poulpy-concepts.mdc](.cursor/rules/poulpy-concepts.mdc) | Key Poulpy concepts (scratch, lifecycle, BDD model, key hierarchy) |
 | [conventions.mdc](.cursor/rules/conventions.mdc) | Coding conventions (structure, types, error handling, naming) |
 | [constraints.mdc](.cursor/rules/constraints.mdc) | Hard constraints — what NOT to do |
+| [squid-js.mdc](.cursor/rules/squid-js.mdc) | squid-js TypeScript package, WASM/NAPI shims, build process |
+| [demo.mdc](.cursor/rules/demo.mdc) | Demo Next.js app and Playwright e2e conventions |

@@ -1,0 +1,85 @@
+---
+description: Module responsibilities, build process, and conventions for packages/squid-js and its Rust shims
+globs: packages/squid-js/src/**/*.ts, crates/squid-wasm/src/**/*.rs, crates/squid-napi/src/**/*.rs
+alwaysApply: false
+---
+
+# squid-js
+
+`packages/squid-js` is the TypeScript package that exposes squid to browsers and Node.js. It wraps two separate Rust shims.
+
+## Two backends, two roles
+
+| Export | Shim | Runtime | Role |
+|---|---|---|---|
+| `@cedoor/squid/client` | `crates/squid-wasm` | Browser (+ Worker) | Keygen, encrypt, decrypt — holds **SecretKey** |
+| `@cedoor/squid/server` | `crates/squid-napi` | Node.js | Homomorphic eval only — **no SecretKey** |
+
+This split is architectural: the server never sees the secret key. Do not collapse them into a single API.
+
+## WASM shim (`crates/squid-wasm`)
+
+Exposes a single `Session` struct (holds `Context`, `SecretKey`, `EvaluationKey`, and `KeygenSeeds`). All methods take `&mut self` because DFT preparation mutates internal state.
+
+- `Session::new_random(params_name)` — generate fresh keys
+- `Session::from_seeds(seeds: &[u8], params_name)` — deterministic keygen from 96-byte seed
+- `Session::seeds()` — export seed bytes
+- `Session::evaluation_key_bytes()` — serialise EK for upload to server
+- `Session::encrypt_u32`, `Session::decrypt_u32` — per-value crypto
+
+Seeds layout: `lattice[32] || bdd_mask[32] || bdd_noise[32]` (96 bytes total).
+
+Built with `wasm-pack build --target web`; output lands in `packages/squid-js/wasm/`. Never edit the `wasm/` directory by hand — it is generated.
+
+The crate requires both `getrandom@0.3` and `getrandom@0.4` with the `wasm_js` feature because transitive Poulpy deps span both versions. Keep both in `Cargo.toml`.
+
+## NAPI shim (`crates/squid-napi`)
+
+Exposes a single `Evaluator` struct (holds `Context` and `EvaluationKey`; no secret key).
+
+- `Evaluator::load(ek_bytes: Buffer, params_name: String)` — static factory, deserialises EK
+- `Evaluator::add_u32(a: Buffer, b: Buffer) -> Buffer` — homomorphic addition
+
+Built with `napi build --cargo-cwd crates/squid-napi --platform --release`; output lands in `packages/squid-js/napi/`. The `napi/` directory is generated — do not edit by hand.
+
+The `napi/package.json` must stay `{"type":"commonjs"}`; napi-rs forces this and the TypeScript import uses `createRequire` to load it from ESM.
+
+## TypeScript structure
+
+```
+src/
+  client.ts           — PoulpyClient: wraps Session via Worker RPC or direct WASM
+  server.ts           — Evaluator import via createRequire (Node only)
+  server-browser-stub.ts  — throws if imported in browser (package exports maps it)
+  squid-worker.ts     — Web Worker that owns the WASM Session
+```
+
+### Worker RPC protocol
+
+`client.ts` checks for `Worker` at runtime. In a browser it spawns `squid-worker.ts` and communicates via `postMessage`. Messages have shape `{ id, kind, ...payload }` where `id` matches requests to responses (`ok: boolean`). Ciphertext buffers are **transferred** (not copied) via the transferable argument to avoid serialisation overhead. If `Worker` is undefined (test environment, Node, etc.) it falls back to direct WASM on the main thread after `client.init(wasmUrl)`.
+
+Do not replace this protocol with a generic RPC library — the transferable-buffer pattern is load-bearing for performance.
+
+## Package exports
+
+```json
+"./client"  → dist/client.js   (browser + worker)
+"./server"  → dist/server.js   (Node) | dist/server-browser-stub.js (browser)
+"./wasm/*"  → wasm/*           (raw wasm-pack output, used by demo scripts)
+```
+
+The `browser` condition in the `server` export is what prevents the NAPI path from bundling into Next.js client chunks. Do not remove it.
+
+## Build order
+
+1. `build:wasm` — Rust → `wasm/`
+2. `build:napi` — Rust → `napi/`
+3. `build:ts` — TypeScript → `dist/`
+
+All three must run before the demo or tests can use the package. Root script: `pnpm run build:squid-js`.
+
+Linux NAPI binaries for publishing are produced via Docker (`build-linux-napi.Dockerfile`); do not attempt cross-compilation from macOS.
+
+## Params matching
+
+Every serialised EK and ciphertext carries the `Params` set it was created with. Passing an EK or ciphertext created under one `Params` to a context using a different one will fail at deserialisation. Always pass the same `paramsSet` string to both `PoulpyClient.create` and `Evaluator.load`.
