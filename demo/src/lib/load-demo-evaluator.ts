@@ -1,6 +1,6 @@
 import { readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { Evaluator } from 'squid-js/server'
+import { Evaluator } from '@cedoor/squid/server'
 
 const PARAMS_SET = process.env.POULPY_PARAMS_SET ?? 'test'
 

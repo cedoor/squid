@@ -4,7 +4,7 @@
   "private": true,
   "description": "Squid FHE monorepo: Rust wrapper, wasm bindings, Node bindings, and a client/server demo.",
   "scripts": {
-    "build:squid-js": "pnpm --filter squid-js build",
+    "build:squid-js": "pnpm --filter @cedoor/squid build",
     "build:demo": "pnpm --filter @squid-js/demo build",
     "build": "pnpm run build:squid-js && pnpm run build:demo",
     "dev": "pnpm --filter @squid-js/demo dev",

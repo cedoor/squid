@@ -8,14 +8,14 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createRequire } from 'node:module'
 
-import init, { Session } from 'squid-js/wasm/squid_wasm.js'
+import init, { Session } from '@cedoor/squid/wasm/squid_wasm.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const outDir = join(__dirname, '..', 'data')
 const outFile = join(outDir, 'demo-ek.test.bin')
 
 const require = createRequire(import.meta.url)
-const wasmPath = require.resolve('squid-js/wasm/squid_wasm_bg.wasm')
+const wasmPath = require.resolve('@cedoor/squid/wasm/squid_wasm_bg.wasm')
 
 const seeds = new Uint8Array(96)
 for (let i = 0; i < 96; i++) {

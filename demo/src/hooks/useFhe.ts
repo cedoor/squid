@@ -83,7 +83,7 @@ function reducer(state: FheState, action: Action): FheState {
 
 export function useFhe() {
   const [state, dispatch] = useReducer(reducer, initial)
-  const clientRef = useRef<import('squid-js/client').PoulpyClient | null>(null)
+  const clientRef = useRef<import('@cedoor/squid/client').PoulpyClient | null>(null)
   const logIdRef = useRef(0)
   const startRef = useRef(Date.now())
 
@@ -102,7 +102,7 @@ export function useFhe() {
     log('info', 'client: building CGGI session from demo seed (deterministic)…')
     log('dim', `  scheme=CGGI  paramsSet=${PARAMS_SET}`)
     try {
-      const { PoulpyClient } = await import('squid-js/client')
+      const { PoulpyClient } = await import('@cedoor/squid/client')
       const client = await PoulpyClient.create({ paramsSet: PARAMS_SET, seeds: DEMO_KEY_SEED })
       clientRef.current = client
 

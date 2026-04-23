@@ -5,27 +5,27 @@ JavaScript bindings for [Squid](https://github.com/cedoor/squid) (ergonomic Rust
 ## Install
 
 ```sh
-npm install squid-js
+npm install @cedoor/squid
 ```
 
-Use `pnpm add squid-js` or `yarn add squid-js` if you prefer. The server entry point ships a native addon; install on the platform you run Node on.
+Use `pnpm add @cedoor/squid` or `yarn add @cedoor/squid` if you prefer. The server entry point ships a native addon; install on the platform you run Node on.
 
 ## Usage
 
-**Browser** — import `squid-js/client`:
+**Browser** — import `@cedoor/squid/client`:
 
 ```ts
-import { PoulpyClient } from "squid-js/client";
+import { PoulpyClient } from "@cedoor/squid/client";
 
 const client = await PoulpyClient.create({ paramsSet: "test" }); // or "unsecure" — must match the server
 const ct = await client.encryptU32(42);
 // Send `client.evaluationKey` and `ct` to the server; decrypt results with `await client.decryptU32(...)`.
 ```
 
-**Node** — import `squid-js/server` (native addon; not for bundlers targeting the browser):
+**Node** — import `@cedoor/squid/server` (native addon; not for bundlers targeting the browser):
 
 ```ts
-import { Evaluator } from "squid-js/server";
+import { Evaluator } from "@cedoor/squid/server";
 
 const ev = Evaluator.load(evaluationKeyBytes, "test");
 const sum = ev.addU32(ctA, ctB);

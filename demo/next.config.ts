@@ -12,7 +12,7 @@ const nextConfig: NextConfig = {
       },
     ]
   },
-  serverExternalPackages: ['squid-js'],
+  serverExternalPackages: ['@cedoor/squid'],
   webpack(config, { isServer }) {
     if (!isServer) {
       config.experiments = { ...config.experiments, asyncWebAssembly: true }
