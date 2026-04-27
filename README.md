@@ -148,6 +148,8 @@ All operations currently require `T = u32` (the only width with compiled BDD cir
 | `ctx.slt(a, b, ek)`  | Signed less-than       |
 | `ctx.sltu(a, b, ek)` | Unsigned less-than     |
 
+Integration tests in [`crates/squid/tests/bdd_ops.rs`](crates/squid/tests/bdd_ops.rs) exercise every method in the table above on `u32` with `Params::test()` and deterministic seeds; run them with `cargo test -p squid`.
+
 ## Backends
 
 | Feature       | Backend    | Notes                           |
@@ -169,7 +171,7 @@ The public API is identical regardless of which backend is selected.
 - [x] Set up GitHub Actions (cargo test, cargo clippy, cargo fmt check): [#3](https://github.com/cedoor/squid/issues/3)
 - [x] Release first alpha version: [#5](https://github.com/cedoor/squid/issues/5)
 - [x] Add at least one runnable example in examples/: [#7](https://github.com/cedoor/squid/issues/7)
-- [ ] Add tests for all existing ops: [#4](https://github.com/cedoor/squid/issues/4)
+- [x] Add tests for all existing ops: [#4](https://github.com/cedoor/squid/issues/4)
 - [ ] Add rustdoc comments to all public items: [#6](https://github.com/cedoor/squid/issues/6)
 - [x] Faster tests via fixtures or deterministic keygen: [#19](https://github.com/cedoor/squid/issues/19)
 
