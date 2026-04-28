@@ -12,14 +12,14 @@ For JavaScript and TypeScript, **[`squid-js`](packages/squid-js)** exposes the s
 
 ## Monorepo structure
 
-| Path                                     | Description                                                      |
-| ---------------------------------------- | ---------------------------------------------------------------- |
-| [`crates/squid`](crates/squid)           | Rust library — ergonomic Poulpy wrapper (this is the main crate) |
-| [`crates/squid-wasm`](crates/squid-wasm) | WebAssembly bindings via `wasm-bindgen` (browser)                |
-| [`crates/squid-napi`](crates/squid-napi) | Node.js native bindings via `napi-rs` (server)                   |
-| [`packages/squid-js`](packages/squid-js) | npm package — browser client + Node evaluator                    |
+| Path                                     | Description                                                                                                             |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| [`crates/squid`](crates/squid)           | Rust library — ergonomic Poulpy wrapper (this is the main crate)                                                        |
+| [`crates/squid-wasm`](crates/squid-wasm) | WebAssembly bindings via `wasm-bindgen` (browser)                                                                       |
+| [`crates/squid-napi`](crates/squid-napi) | Node.js native bindings via `napi-rs` (server)                                                                          |
+| [`packages/squid-js`](packages/squid-js) | npm package — browser client + Node evaluator                                                                           |
 | [`demo`](demo)                           | Next.js demo: keygen in browser, homomorphic eval on server — **[live at squid.cedoor.dev](https://squid.cedoor.dev/)** |
-| [`tests`](tests)                         | Playwright end-to-end tests for the demo                         |
+| [`tests`](tests)                         | Playwright end-to-end tests for the demo                                                                                |
 
 The Cargo workspace ties the three Rust crates together. The pnpm workspace ties [`squid-js`](packages/squid-js), the demo, and the E2E tests together.
 
@@ -174,6 +174,7 @@ The public API is identical regardless of which backend is selected.
 - [x] Add tests for all existing ops: [#4](https://github.com/cedoor/squid/issues/4)
 - [ ] Add rustdoc comments to all public items: [#6](https://github.com/cedoor/squid/issues/6)
 - [x] Faster tests via fixtures or deterministic keygen: [#19](https://github.com/cedoor/squid/issues/19)
+- [ ] Refactor `context.rs`: [#20](https://github.com/cedoor/squid/issues/20)
 
 ### Milestone 2 — Full bin_fhe Coverage: [#2](https://github.com/cedoor/squid/milestone/2)
 
@@ -192,7 +193,6 @@ The public API is identical regardless of which backend is selected.
 - [ ] Realistic examples: [#16](https://github.com/cedoor/squid/issues/16)
 - [ ] Benchmarks: [#17](https://github.com/cedoor/squid/issues/17)
 - [ ] Vetted Params presets: [#18](https://github.com/cedoor/squid/issues/18)
-- [ ] Refactor `context.rs`: [#20](https://github.com/cedoor/squid/issues/20)
 - [ ] Add CHANGELOG file: [#26](https://github.com/cedoor/squid/issues/26)
 - [x] [#22](https://github.com/cedoor/squid/issues/22) — closed: `Context` no longer keeps a persistent max-sized arena; scratch is allocated per operation from Poulpy's `*_tmp_bytes` (supersedes the issue's "split keygen vs runtime" split).
 
