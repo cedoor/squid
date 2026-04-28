@@ -11,3 +11,4 @@ Developer guide for AI assistants working in this repo. Detailed rules live in `
 | [constraints.mdc](.cursor/rules/constraints.mdc) | Hard constraints — what NOT to do |
 | [squid-js.mdc](.cursor/rules/squid-js.mdc) | squid-js TypeScript package, WASM/NAPI shims, build process |
 | [demo.mdc](.cursor/rules/demo.mdc) | Demo Next.js app and Playwright e2e conventions |
+| [changelog.mdc](.cursor/rules/changelog.mdc) | `CHANGELOG.md` (Keep a Changelog), **`[Unreleased]`** on each merge, release flow |
