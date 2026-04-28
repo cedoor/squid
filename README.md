@@ -193,7 +193,7 @@ The public API is identical regardless of which backend is selected.
 - [ ] Realistic examples: [#16](https://github.com/cedoor/squid/issues/16)
 - [ ] Benchmarks: [#17](https://github.com/cedoor/squid/issues/17)
 - [ ] Vetted Params presets: [#18](https://github.com/cedoor/squid/issues/18)
-- [ ] Add CHANGELOG file: [#26](https://github.com/cedoor/squid/issues/26)
+- [x] Add CHANGELOG file: [#26](https://github.com/cedoor/squid/issues/26)
 - [x] [#22](https://github.com/cedoor/squid/issues/22) — closed: `Context` no longer keeps a persistent max-sized arena; scratch is allocated per operation from Poulpy's `*_tmp_bytes` (supersedes the issue's "split keygen vs runtime" split).
 
 ## Design goals
